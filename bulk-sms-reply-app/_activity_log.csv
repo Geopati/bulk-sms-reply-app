@@ -1,0 +1,8 @@
+timestamp_utc,directory,file,action,description
+2026-09-14T00:00:00Z,bulk-sms-reply-app,settings.gradle.kts,created,Gradle settings - declares app module and plugin repositories
+2026-09-14T00:00:00Z,bulk-sms-reply-app,build.gradle.kts,created,Top-level Gradle build file - declares AGP and Kotlin plugin versions
+2026-09-14T00:00:00Z,bulk-sms-reply-app,gradle.properties,created,Gradle/AndroidX project properties
+2026-09-14T00:00:00Z,bulk-sms-reply-app,.gitignore,created,Standard Android/Gradle ignore rules for future git use
+2026-09-14T00:00:00Z,bulk-sms-reply-app,README.md,created,Project overview, build/install instructions, and known limitations
+2026-09-14T00:00:00Z,bulk-sms-reply-app,_activity_log.csv,created,This log file - top-level project activity
+note,,,,"Per-directory logs for deeper source folders (app/, app/src/main/java/..., app/src/main/res/...) are consolidated into this file and app/_activity_log.csv rather than one CSV per nested folder, to keep the source tree readable. Ask Claude to expand this to a log in every subfolder if you'd prefer that instead."
