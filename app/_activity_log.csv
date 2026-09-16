@@ -1,0 +1,20 @@
+timestamp_utc,relative_path,action,description
+2026-09-14T00:00:00Z,app/build.gradle.kts,created,App module Gradle config - dependencies, SDK versions
+2026-09-14T00:00:00Z,app/proguard-rules.pro,created,Placeholder ProGuard rules (unused while minify is off)
+2026-09-14T00:00:00Z,app/src/main/AndroidManifest.xml,created,Declares READ_SMS/SEND_SMS permissions and the single MainActivity
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/Conversation.kt,created,Data model for one collapsed text-message thread
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/PhoneNumbers.kt,created,Loose phone-number normalization/comparison helper
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/SmsRepository.kt,created,Reads the SMS inbox content provider into Conversation objects
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/BlocklistStore.kt,created,SharedPreferences-backed app-local block list
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/SendHelper.kt,created,Sends bulk replies and 7726 spam-forward via SmsManager
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MainActivity.kt,created,Entry point - permission flow and screen state wiring
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/ConversationListScreen.kt,created,Compose UI - conversation list, multi-select, bulk-action dialog
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/Theme.kt,created,Compose Material3 theme
+2026-09-14T00:00:00Z,app/src/main/res/values/strings.xml,created,App name string
+2026-09-14T00:00:00Z,app/src/main/res/values/colors.xml,created,Launcher icon background color
+2026-09-14T00:00:00Z,app/src/main/res/values/themes.xml,created,Base platform theme (window background/no action bar)
+2026-09-14T00:00:00Z,app/src/main/res/drawable/ic_launcher_background.xml,created,Launcher icon background shape
+2026-09-14T00:00:00Z,app/src/main/res/drawable/ic_launcher_foreground.xml,created,Launcher icon foreground glyph (speech bubble + check)
+2026-09-14T00:00:00Z,app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml,created,Adaptive launcher icon definition
+2026-09-14T00:00:00Z,app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml,created,Adaptive launcher icon definition (round variant)
+2026-09-14T00:00:00Z,app/_activity_log.csv,created,This log file - app module activity

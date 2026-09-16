@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simple "checked messages" glyph: a speech bubble with a checkmark,
+     used as the adaptive-icon foreground layer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,30 h60 a8,8 0 0 1 8,8 v28 a8,8 0 0 1 -8,8 h-34 l-16,14 v-14 h-10 a8,8 0 0 1 -8,-8 v-28 a8,8 0 0 1 8,-8 z" />
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M40,58 l9,9 l19,-19 l-5,-5 l-14,14 l-4,-4 z" />
+</vector>
