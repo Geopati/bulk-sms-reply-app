@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        READ_SMS: lets the app list your existing text conversations.
+        SEND_SMS: lets the app send the bulk reply (e.g. "STOP") and the
+                  optional 7726 spam-forward on your behalf.
+        These are ordinary runtime permissions - Android will show you a
+        permission dialog the first time the app needs them. This app is
+        NOT a default SMS handler, so it cannot delete messages from, or
+        hide messages in, your regular Messages app - see the README for
+        what that does and doesn't mean.
+    -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BulkTextReply"
+        android:icon="@mipmap/ic_launcher">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.BulkTextReply">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,257 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package com.georgeapp.bulksmsreply.ui
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.georgeapp.bulksmsreply.AttributionExtractor
+import com.georgeapp.bulksmsreply.Conversation
+import com.georgeapp.bulksmsreply.PhoneNumbers
+import java.text.DateFormat
+import java.util.Date
+
+@Composable
+fun ConversationListScreen(
+    conversations: List<Conversation>,
+    selectedAddresses: Set<String>,
+    onToggleSelected: (Conversation) -> Unit,
+    onSelectAll: () -> Unit,
+    /** Selects only the conversations that still have something this app
+     *  hasn't marked read yet - a shortcut for "select everything I still
+     *  need to process," instead of checking each box by hand. */
+    onSelectAllUnread: () -> Unit,
+    onClearSelection: () -> Unit,
+    /** Normalized addresses this app hasn't marked "read" yet (see
+     *  MessageLogDatabase.markThreadRead) - drives the "Unread" tag below.
+     *  This reflects only this app's own bookkeeping, not the phone's
+     *  actual SMS read flag. */
+    unreadAddresses: Set<String>,
+    onApplyBulkAction: (sendReply: String?, block: Boolean, reportSpam: Boolean) -> Unit
+) {
+    var showActionSheet by rememberSaveable { mutableStateOf(false) }
+    var showUnreadOnly by rememberSaveable { mutableStateOf(false) }
+
+    val visibleConversations = if (showUnreadOnly) {
+        conversations.filter { unreadAddresses.contains(PhoneNumbers.normalize(it.address)) }
+    } else {
+        conversations
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Bulk SMS Reply Log") },
+                actions = {
+                    TextButton(onClick = onSelectAll) { Text("Select all") }
+                    TextButton(onClick = onSelectAllUnread) { Text("Select unread") }
+                    TextButton(onClick = onClearSelection) { Text("Clear") }
+                }
+            )
+        },
+        bottomBar = {
+            if (selectedAddresses.isNotEmpty()) {
+                BottomAppBar {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("${selectedAddresses.size} selected")
+                        Button(onClick = { showActionSheet = true }) {
+                            Icon(Icons.Filled.Send, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Bulk action")
+                        }
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilterChip(
+                    selected = showUnreadOnly,
+                    onClick = { showUnreadOnly = !showUnreadOnly },
+                    label = { Text("Unread only") }
+                )
+            }
+
+            if (conversations.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No text conversations found (or permission not yet granted).")
+                }
+            } else if (visibleConversations.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Nothing unread - you're all caught up.")
+                }
+            } else {
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(visibleConversations, key = { it.address }) { conversation ->
+                        ConversationRow(
+                            conversation = conversation,
+                            selected = selectedAddresses.contains(conversation.address),
+                            unread = unreadAddresses.contains(PhoneNumbers.normalize(conversation.address)),
+                            onToggle = { onToggleSelected(conversation) }
+                        )
+                        HorizontalDivider()
+                    }
+                }
+            }
+        }
+    }
+
+    if (showActionSheet) {
+        BulkActionDialog(
+            selectedCount = selectedAddresses.size,
+            onDismiss = { showActionSheet = false },
+            onConfirm = { sendReply, block, reportSpam ->
+                showActionSheet = false
+                onApplyBulkAction(sendReply, block, reportSpam)
+            }
+        )
+    }
+}
+
+@Composable
+private fun ConversationRow(
+    conversation: Conversation,
+    selected: Boolean,
+    unread: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = selected, onCheckedChange = { onToggle() })
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            // When the message itself discloses who it's on behalf of
+            // (e.g. "Paid for by...", "on behalf of..."), lead with that
+            // instead of the bare phone number - same attribution logic
+            // used in the Log and Reports tabs.
+            val attribution = remember(conversation.lastMessageBody) {
+                AttributionExtractor.extract(conversation.lastMessageBody)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    attribution?.let { "On behalf of $it" } ?: conversation.address,
+                    fontWeight = FontWeight.Bold
+                )
+                if (unread) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "UNREAD",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            if (attribution != null) {
+                Text(
+                    conversation.address,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                conversation.lastMessageBody,
+                maxLines = 3,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                DateFormat.getDateInstance(DateFormat.SHORT)
+                    .format(Date(conversation.lastMessageDateMillis)),
+                style = MaterialTheme.typography.labelSmall
+            )
+            Text(
+                "${conversation.messageCount} msg${if (conversation.messageCount == 1) "" else "s"}",
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun BulkActionDialog(
+    selectedCount: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (sendReply: String?, block: Boolean, reportSpam: Boolean) -> Unit
+) {
+    var sendReplyEnabled by rememberSaveable { mutableStateOf(true) }
+    var replyText by rememberSaveable { mutableStateOf("STOP") }
+    var blockEnabled by rememberSaveable { mutableStateOf(true) }
+    var reportSpamEnabled by rememberSaveable { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Apply to $selectedCount conversation${if (selectedCount == 1) "" else "s"}") },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = sendReplyEnabled, onCheckedChange = { sendReplyEnabled = it })
+                    Text("Send this reply to each:")
+                }
+                OutlinedTextField(
+                    value = replyText,
+                    onValueChange = { replyText = it },
+                    enabled = sendReplyEnabled,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(start = 40.dp, bottom = 8.dp)
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = blockEnabled, onCheckedChange = { blockEnabled = it })
+                    Icon(Icons.Filled.Block, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text("Hide these numbers in this app going forward")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = reportSpamEnabled, onCheckedChange = { reportSpamEnabled = it })
+                    Icon(Icons.Filled.Report, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text("Forward each last message to 7726 (spam report)")
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "This will send real text messages from your phone number and may use your plan's messaging allotment.",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm(
+                    if (sendReplyEnabled && replyText.isNotBlank()) replyText else null,
+                    blockEnabled,
+                    reportSpamEnabled
+                )
+            }) { Text("Apply") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}

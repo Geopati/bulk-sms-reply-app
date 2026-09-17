@@ -1,0 +1,38 @@
+timestamp_utc,relative_path,action,description
+2026-09-14T00:00:00Z,app/build.gradle.kts,created,App module Gradle config - dependencies, SDK versions
+2026-09-14T00:00:00Z,app/proguard-rules.pro,created,Placeholder ProGuard rules (unused while minify is off)
+2026-09-14T00:00:00Z,app/src/main/AndroidManifest.xml,created,Declares READ_SMS/SEND_SMS permissions and the single MainActivity
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/Conversation.kt,created,Data model for one collapsed text-message thread
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/PhoneNumbers.kt,created,Loose phone-number normalization/comparison helper
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/SmsRepository.kt,created,Reads the SMS inbox content provider into Conversation objects
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/BlocklistStore.kt,created,SharedPreferences-backed app-local block list
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/SendHelper.kt,created,Sends bulk replies and 7726 spam-forward via SmsManager
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MainActivity.kt,created,Entry point - permission flow and screen state wiring
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/ConversationListScreen.kt,created,Compose UI - conversation list, multi-select, bulk-action dialog
+2026-09-14T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/Theme.kt,created,Compose Material3 theme
+2026-09-14T00:00:00Z,app/src/main/res/values/strings.xml,created,App name string
+2026-09-14T00:00:00Z,app/src/main/res/values/colors.xml,created,Launcher icon background color
+2026-09-14T00:00:00Z,app/src/main/res/values/themes.xml,created,Base platform theme (window background/no action bar)
+2026-09-14T00:00:00Z,app/src/main/res/drawable/ic_launcher_background.xml,created,Launcher icon background shape
+2026-09-14T00:00:00Z,app/src/main/res/drawable/ic_launcher_foreground.xml,created,Launcher icon foreground glyph (speech bubble + check)
+2026-09-14T00:00:00Z,app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml,created,Adaptive launcher icon definition
+2026-09-14T00:00:00Z,app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml,created,Adaptive launcher icon definition (round variant)
+2026-09-14T00:00:00Z,app/_activity_log.csv,created,This log file - app module activity
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/ConversationListScreen.kt,fixed,"Added missing rememberSaveable import and @file:OptIn for TopAppBar/BottomAppBar - fixed real build error from GitHub Actions"
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/ConversationListScreen.kt,updated,Message preview now shows up to 3 lines instead of 1 (Mr. George's request)
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/AttributionExtractor.kt,created,"Best-effort extraction of ""paid for by / on behalf of / authorized by"" disclosures from a message's text"
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MessageLogEntry.kt,created,Data models for one running-log row and one raw incoming SMS
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MessageLogDatabase.kt,created,SQLite-backed running log of every incoming message plus any action taken on it - supports search/query and full-history reads for reports
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ReportGenerator.kt,created,Buckets the log into day/week/month/quarter/half-year/year breakdowns with per-sender counts
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/SmsRepository.kt,updated,Added loadAllRawMessages() - every individual inbox message (not just latest per sender) for the log
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/LogScreen.kt,created,Searchable/queryable view of the running log with quick date-range filters
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/ReportsScreen.kt,created,Period-selector + per-sender breakdown report screen
+2026-09-16T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MainActivity.kt,updated,Added 3-tab bottom navigation (Messages/Log/Reports) and wired logging + action recording into the bulk-action flow
+2026-09-16T00:00:00Z,app/src/main/res/values/strings.xml,updated,"App display name changed from ""Bulk Text Reply"" to ""Bulk SMS Reply Log"" (folder/project also renamed to bulk-sms-reply-log-app; Android package ID com.georgeapp.bulksmsreply deliberately left unchanged for build safety)"
+2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MessageLogDatabase.kt,updated,"Added read_locally column (DB version 1->2, with in-place ALTER TABLE migration) plus markThreadRead() and unreadNormalizedAddresses() - app-local ""mark as read"" feature; cannot write the phone's real SMS read flag since this app is not the default texting app"
+2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MessageLogEntry.kt,updated,Added readLocally field reflecting the new app-local read state
+2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MainActivity.kt,updated,"Calls messageLogDatabase.markThreadRead() after any bulk action is applied; tracks unreadNormalizedAddresses state and passes it to ConversationListScreen"
+2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/ConversationListScreen.kt,updated,Shows an UNREAD tag on conversations this app hasn't marked read yet
+2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/LogScreen.kt,updated,Each log row now shows Read/Unread (in this app) status
+2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/ConversationListScreen.kt,updated,"Added ""Unread only"" filter chip, a ""Select unread"" shortcut button, and an on-behalf-of attribution label (falls back to the raw number) on each conversation row"
+2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MainActivity.kt,updated,Wired onSelectAllUnread callback (selects every conversation with unread messages)
