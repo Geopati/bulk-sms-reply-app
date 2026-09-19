@@ -36,3 +36,4 @@ timestamp_utc,relative_path,action,description
 2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/LogScreen.kt,updated,Each log row now shows Read/Unread (in this app) status
 2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/ui/ConversationListScreen.kt,updated,"Added ""Unread only"" filter chip, a ""Select unread"" shortcut button, and an on-behalf-of attribution label (falls back to the raw number) on each conversation row"
 2026-09-17T00:00:00Z,app/src/main/java/com/georgeapp/bulksmsreply/MainActivity.kt,updated,Wired onSelectAllUnread callback (selects every conversation with unread messages)
+2026-09-19T00:00:00Z,app/build.gradle.kts,updated,"Added signingConfigs.debug pointing at the repo-root debug.keystore and set buildTypes.debug.signingConfig to it, so debug builds (local or CI) always share one signature."

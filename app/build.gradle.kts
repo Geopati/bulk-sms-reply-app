@@ -15,7 +15,27 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        // Pinned debug key so every build (Android Studio or GitHub
+        // Actions) is signed identically. Without this, each CI run
+        // generated its own throwaway debug key, and Android refuses to
+        // install an "update" APK signed with a different key than the
+        // one already on the phone - forcing an uninstall each time.
+        // This is a debug-only key with Android's own well-known debug
+        // credentials (never used for a release build), so committing it
+        // is safe and is the standard fix for this problem.
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
