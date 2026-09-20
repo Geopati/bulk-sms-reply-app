@@ -17,8 +17,15 @@ enum class ReportPeriod(val label: String, val bucketsToShow: Int) {
     YEAR("Year", 5)
 }
 
-/** How many texts came in from one sender within a period. */
-data class SenderCount(val senderLabel: String, val count: Int)
+/** How many texts came in from one sender within a period, plus the
+ *  individual messages themselves (newest first) so a report row can be
+ *  expanded to show full text/URLs and the action taken on each one
+ *  (Round 5: tap-to-expand, CSV export). */
+data class SenderCount(
+    val senderLabel: String,
+    val count: Int,
+    val messages: List<MessageLogEntry> = emptyList()
+)
 
 /** One row of a report: a time period plus its total and per-sender breakdown. */
 data class PeriodBucket(
@@ -58,7 +65,8 @@ object ReportGenerator {
                 .map { (_, groupItems) ->
                     SenderCount(
                         senderLabel = groupItems.first().senderLabel,
-                        count = groupItems.size
+                        count = groupItems.size,
+                        messages = groupItems.sortedByDescending { it.smsDateMillis }
                     )
                 }
                 .sortedByDescending { it.count }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Round 5: tells FileProvider which of the app's own folders it's
+    allowed to hand out short-lived URIs for, so the CSV export share
+    sheet (CsvExporter.kt) can attach a file without needing broad
+    storage permissions. Only the "exports" cache subfolder is exposed.
+-->
+<paths>
+    <cache-path name="exports" path="exports/" />
+</paths>

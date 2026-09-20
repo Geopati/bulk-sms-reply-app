@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -23,10 +24,12 @@ import com.georgeapp.bulksmsreply.ui.BulkTextReplyTheme
 import com.georgeapp.bulksmsreply.ui.ConversationListScreen
 import com.georgeapp.bulksmsreply.ui.LogScreen
 import com.georgeapp.bulksmsreply.ui.ReportsScreen
+import com.georgeapp.bulksmsreply.ui.SrbScreen
 import com.georgeapp.bulksmsreply.ui.rangeDaysToSinceMillis
 
 private enum class AppTab(val label: String) {
     MESSAGES("Messages"),
+    SRB("S.R.B."),
     LOG("Log"),
     REPORTS("Reports")
 }
@@ -83,6 +86,12 @@ private fun AppRoot(
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     var refreshTrigger by remember { mutableStateOf(0) }
     var unreadNormalizedAddresses by remember { mutableStateOf<Set<String>>(emptySet()) }
+    // Round 5: conversations whose latest message already had a bulk
+    // action applied - shown on the S.R.B. tab instead of Messages, so
+    // they can't be accidentally selected and processed a second time.
+    var processedConversations by remember {
+        mutableStateOf<List<MessageLogDatabase.ProcessedConversation>>(emptyList())
+    }
 
     var logSearchText by remember { mutableStateOf("") }
     var logRangeDays by remember { mutableStateOf<Int?>(30) }
@@ -105,10 +114,18 @@ private fun AppRoot(
             val rawMessages = SmsRepository.loadAllRawMessages(context)
             messageLogDatabase.recordIncoming(rawMessages)
 
+            // Round 5: figure out which conversations are already
+            // processed (S.R.B. tab) BEFORE building the Messages list,
+            // so processed ones can be filtered out of Messages entirely.
+            val processed = messageLogDatabase.processedConversations()
+            processedConversations = processed
+            val processedAddresses = processed.map { it.normalizedAddress }.toSet()
+
             val loaded = SmsRepository.loadConversations(context)
             val blocked = blocklistStore.getBlockedNumbers()
             allConversations = loaded.filterNot { conversation ->
-                blocked.contains(PhoneNumbers.normalize(conversation.address))
+                val normalized = PhoneNumbers.normalize(conversation.address)
+                blocked.contains(normalized) || processedAddresses.contains(normalized)
             }
             selectedAddresses = emptySet()
             unreadNormalizedAddresses = messageLogDatabase.unreadNormalizedAddresses()
@@ -153,6 +170,12 @@ private fun AppRoot(
                         onClick = { selectedTab = AppTab.MESSAGES },
                         icon = { Icon(Icons.Filled.Home, contentDescription = null) },
                         label = { Text(AppTab.MESSAGES.label) }
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == AppTab.SRB,
+                        onClick = { selectedTab = AppTab.SRB },
+                        icon = { Icon(Icons.Filled.Block, contentDescription = null) },
+                        label = { Text(AppTab.SRB.label) }
                     )
                     NavigationBarItem(
                         selected = selectedTab == AppTab.LOG,
@@ -231,6 +254,8 @@ private fun AppRoot(
                             refreshTrigger += 1
                         }
                     )
+
+                    AppTab.SRB -> SrbScreen(processed = processedConversations)
 
                     AppTab.LOG -> LogScreen(
                         entries = logEntries,

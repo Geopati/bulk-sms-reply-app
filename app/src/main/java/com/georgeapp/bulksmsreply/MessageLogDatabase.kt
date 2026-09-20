@@ -156,6 +156,66 @@ class MessageLogDatabase(context: Context) :
     }
 
     /**
+     * One conversation that has had a bulk action (reply/block/report)
+     * applied to its most recent message - i.e. it belongs in the S.R.B.
+     * (Stop/Report/Block) tab instead of the main Messages tab. If a new,
+     * not-yet-actioned message later arrives from the same sender, that
+     * sender naturally drops out of this list and reappears in Messages -
+     * only the conversation's CURRENT latest message matters, not its
+     * history.
+     */
+    data class ProcessedConversation(
+        val normalizedAddress: String,
+        val address: String,
+        val attribution: String?,
+        val body: String,
+        val action: String,
+        val actionAtMillis: Long
+    )
+
+    /**
+     * Conversations whose most recent message already has a bulk action
+     * recorded against it - drives the S.R.B. tab and the Messages-tab
+     * filter that hides them there (see MainActivity). Uses only the
+     * existing action/action_at columns - no schema change needed.
+     */
+    fun processedConversations(): List<ProcessedConversation> {
+        val sql = """
+            SELECT $COL_NORMALIZED_ADDRESS, $COL_ADDRESS, $COL_ATTRIBUTION, $COL_BODY, $COL_ACTION, $COL_ACTION_AT
+            FROM $TABLE m1
+            WHERE $COL_SMS_DATE = (
+                SELECT MAX($COL_SMS_DATE) FROM $TABLE m2
+                WHERE m2.$COL_NORMALIZED_ADDRESS = m1.$COL_NORMALIZED_ADDRESS
+            )
+            AND $COL_ACTION IS NOT NULL AND $COL_ACTION != ''
+            ORDER BY $COL_ACTION_AT DESC
+        """.trimIndent()
+
+        val result = mutableListOf<ProcessedConversation>()
+        readableDatabase.rawQuery(sql, null).use { cursor ->
+            val normalizedIdx = cursor.getColumnIndexOrThrow(COL_NORMALIZED_ADDRESS)
+            val addressIdx = cursor.getColumnIndexOrThrow(COL_ADDRESS)
+            val attributionIdx = cursor.getColumnIndexOrThrow(COL_ATTRIBUTION)
+            val bodyIdx = cursor.getColumnIndexOrThrow(COL_BODY)
+            val actionIdx = cursor.getColumnIndexOrThrow(COL_ACTION)
+            val actionAtIdx = cursor.getColumnIndexOrThrow(COL_ACTION_AT)
+            while (cursor.moveToNext()) {
+                result.add(
+                    ProcessedConversation(
+                        normalizedAddress = cursor.getString(normalizedIdx),
+                        address = cursor.getString(addressIdx),
+                        attribution = if (cursor.isNull(attributionIdx)) null else cursor.getString(attributionIdx),
+                        body = cursor.getString(bodyIdx),
+                        action = cursor.getString(actionIdx),
+                        actionAtMillis = cursor.getLong(actionAtIdx)
+                    )
+                )
+            }
+        }
+        return result
+    }
+
+    /**
      * Searchable view of the log for the Log screen. [searchText] matches
      * against the sender number, the extracted attribution, and the
      * message body (case-insensitive substring). [sinceMillis] limits how

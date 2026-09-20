@@ -30,5 +30,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Round 5: lets CsvExporter.kt hand a CSV file to the share
+            sheet (save/email/Drive) without this app needing broad
+            storage permissions. Only exposes its own cache/exports/
+            folder - see res/xml/file_paths.xml.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

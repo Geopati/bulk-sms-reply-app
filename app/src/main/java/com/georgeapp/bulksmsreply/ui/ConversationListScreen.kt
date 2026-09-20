@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
@@ -16,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.georgeapp.bulksmsreply.APP_VERSION
+import com.georgeapp.bulksmsreply.APP_VERSION_NOTES
 import com.georgeapp.bulksmsreply.AttributionExtractor
 import com.georgeapp.bulksmsreply.Conversation
 import com.georgeapp.bulksmsreply.PhoneNumbers
@@ -42,6 +45,7 @@ fun ConversationListScreen(
 ) {
     var showActionSheet by rememberSaveable { mutableStateOf(false) }
     var showUnreadOnly by rememberSaveable { mutableStateOf(false) }
+    var showAboutDialog by rememberSaveable { mutableStateOf(false) }
 
     val visibleConversations = if (showUnreadOnly) {
         conversations.filter { unreadAddresses.contains(PhoneNumbers.normalize(it.address)) }
@@ -57,6 +61,9 @@ fun ConversationListScreen(
                     TextButton(onClick = onSelectAll) { Text("Select all") }
                     TextButton(onClick = onSelectAllUnread) { Text("Select unread") }
                     TextButton(onClick = onClearSelection) { Text("Clear") }
+                    IconButton(onClick = { showAboutDialog = true }) {
+                        Icon(Icons.Filled.Info, contentDescription = "About")
+                    }
                 }
             )
         },
@@ -97,7 +104,10 @@ fun ConversationListScreen(
 
             if (conversations.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No text conversations found (or permission not yet granted).")
+                    Text(
+                        "Nothing here - either permission isn't granted yet, or " +
+                            "everything's already been processed (check the S.R.B. tab)."
+                    )
                 }
             } else if (visibleConversations.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -129,6 +139,17 @@ fun ConversationListScreen(
             }
         )
     }
+
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            title = { Text("Bulk SMS Reply Log") },
+            text = { Text("Version $APP_VERSION\n\n$APP_VERSION_NOTES") },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) { Text("OK") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -147,18 +168,15 @@ private fun ConversationRow(
         Checkbox(checked = selected, onCheckedChange = { onToggle() })
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
-            // When the message itself discloses who it's on behalf of
-            // (e.g. "Paid for by...", "on behalf of..."), lead with that
-            // instead of the bare phone number - same attribution logic
-            // used in the Log and Reports tabs.
-            val attribution = remember(conversation.lastMessageBody) {
-                AttributionExtractor.extract(conversation.lastMessageBody)
+            // Round 5: "RE: [label]" - a last name or business name found
+            // in the message's own disclosure, or a Political/Commercial
+            // guess when it doesn't say one. Same logic used in the Log
+            // and Reports tabs (AttributionExtractor.reLabel).
+            val label = remember(conversation.lastMessageBody) {
+                AttributionExtractor.reLabel(conversation.lastMessageBody)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    attribution?.let { "On behalf of $it" } ?: conversation.address,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(label, fontWeight = FontWeight.Bold)
                 if (unread) {
                     Spacer(Modifier.width(6.dp))
                     Text(
@@ -169,13 +187,11 @@ private fun ConversationRow(
                     )
                 }
             }
-            if (attribution != null) {
-                Text(
-                    conversation.address,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                conversation.address,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Text(
                 conversation.lastMessageBody,
                 maxLines = 3,

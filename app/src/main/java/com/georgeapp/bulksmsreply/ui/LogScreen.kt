@@ -5,11 +5,15 @@ package com.georgeapp.bulksmsreply.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.georgeapp.bulksmsreply.CsvExporter
 import com.georgeapp.bulksmsreply.MessageLogEntry
 import java.text.DateFormat
 import java.util.Date
@@ -37,6 +41,8 @@ fun LogScreen(
     selectedRangeDays: Int?,
     onRangeSelected: (Int?) -> Unit
 ) {
+    val context = LocalContext.current
+
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         OutlinedTextField(
             value = searchText,
@@ -61,10 +67,23 @@ fun LogScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        Text(
-            "${entries.size} message${if (entries.size == 1) "" else "s"} logged",
-            style = MaterialTheme.typography.labelMedium
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "${entries.size} message${if (entries.size == 1) "" else "s"} logged",
+                style = MaterialTheme.typography.labelMedium
+            )
+            TextButton(
+                onClick = { CsvExporter.exportLog(context, entries) },
+                enabled = entries.isNotEmpty()
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Export CSV")
+            }
+        }
 
         Spacer(Modifier.height(4.dp))
 
@@ -105,14 +124,14 @@ private fun LogRow(entry: MessageLogEntry) {
                 color = MaterialTheme.colorScheme.primary
             )
         }
-        Text(
-            if (entry.readLocally) "Read (in this app)" else "Unread (in this app)",
-            style = MaterialTheme.typography.labelSmall,
-            color = if (entry.readLocally) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.error
-            }
-        )
+        // Round 5: only flag unread messages - a processed/read one shows
+        // nothing here rather than a "Read (in this app)" line.
+        if (!entry.readLocally) {
+            Text(
+                "Unread",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
     }
 }

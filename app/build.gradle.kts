@@ -11,8 +11,9 @@ android {
         applicationId = "com.georgeapp.bulksmsreply"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        // Kept in step with AppInfo.kt's APP_VERSION (Round N = version 1.N).
+        versionCode = 2
+        versionName = "1.5.0"
     }
 
     signingConfigs {

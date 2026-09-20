@@ -17,17 +17,21 @@ data class MessageLogEntry(
      *  for why). */
     val readLocally: Boolean = false
 ) {
-    /** What to show as "who this was from" - the extracted attribution
-     *  when we have one, otherwise a plain note plus the raw number. */
+    /** What to show as "who this was from": the "RE: ..." label (Round 5) -
+     *  a last name or business name found in the message's own disclosure,
+     *  or a Political/Commercial guess when it doesn't say. See
+     *  AttributionExtractor.reLabel for the priority order. */
     val senderLabel: String
-        get() = attribution?.let { "On behalf of $it" } ?: "Not stated ($address)"
+        get() = AttributionExtractor.reLabel(attribution, body)
 
     /** The key used to group this entry with others from the same
-     *  real-world sender for the reports screen: prefer the attribution
-     *  text (so the same campaign texting from many numbers still groups
-     *  together), otherwise fall back to the phone number. */
+     *  real-world sender for the reports screen. Grouping by the RE: label
+     *  itself (rather than the raw disclosure text) is intentional: it's
+     *  what lets two differently-worded disclosures for the same person
+     *  ("John Smith for Congress" / "Re-Elect Smith") collapse into one
+     *  "RE: Smith" bucket. */
     val senderGroupKey: String
-        get() = attribution ?: normalizedAddress
+        get() = senderLabel
 }
 
 /** A raw row read straight from the phone's SMS inbox, before any of our
