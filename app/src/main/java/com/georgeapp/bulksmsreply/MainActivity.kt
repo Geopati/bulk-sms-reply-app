@@ -92,6 +92,10 @@ private fun AppRoot(
     var processedConversations by remember {
         mutableStateOf<List<MessageLogDatabase.ProcessedConversation>>(emptyList())
     }
+    // Round 6: Mr. George's manual Political/Commercial/No-label choices,
+    // normalized address -> override value. Loaded alongside everything
+    // else below and re-loaded on every refreshTrigger bump.
+    var labelOverrides by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     var logSearchText by remember { mutableStateOf("") }
     var logRangeDays by remember { mutableStateOf<Int?>(30) }
@@ -129,6 +133,7 @@ private fun AppRoot(
             }
             selectedAddresses = emptySet()
             unreadNormalizedAddresses = messageLogDatabase.unreadNormalizedAddresses()
+            labelOverrides = messageLogDatabase.labelOverrides()
         }
     }
 
@@ -251,6 +256,16 @@ private fun AppRoot(
                             }
 
                             snackbarMessage = buildSummary(targeted.size, sendReply != null, block, reportSpam)
+                            refreshTrigger += 1
+                        },
+                        labelOverrides = labelOverrides,
+                        onSetLabelOverride = { address, override ->
+                            messageLogDatabase.setLabelOverride(address, override)
+                            refreshTrigger += 1
+                        },
+                        onMarkAllRead = { addresses ->
+                            messageLogDatabase.markAllRead(addresses, System.currentTimeMillis())
+                            snackbarMessage = "Marked ${addresses.size} conversation${if (addresses.size == 1) "" else "s"} as read."
                             refreshTrigger += 1
                         }
                     )
