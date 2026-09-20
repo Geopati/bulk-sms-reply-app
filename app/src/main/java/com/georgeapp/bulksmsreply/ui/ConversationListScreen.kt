@@ -5,10 +5,14 @@ package com.georgeapp.bulksmsreply.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.georgeapp.bulksmsreply.APP_VERSION
-import com.georgeapp.bulksmsreply.APP_VERSION_NOTES
+import com.georgeapp.bulksmsreply.APP_VERSION_HISTORY
 import com.georgeapp.bulksmsreply.AttributionExtractor
 import com.georgeapp.bulksmsreply.Conversation
 import com.georgeapp.bulksmsreply.PhoneNumbers
@@ -41,7 +45,16 @@ fun ConversationListScreen(
      *  This reflects only this app's own bookkeeping, not the phone's
      *  actual SMS read flag. */
     unreadAddresses: Set<String>,
-    onApplyBulkAction: (sendReply: String?, block: Boolean, reportSpam: Boolean) -> Unit
+    onApplyBulkAction: (sendReply: String?, block: Boolean, reportSpam: Boolean) -> Unit,
+    /** Mr. George's manual Political/Commercial/No-label choices, keyed by
+     *  normalized address (Round 6) - null/absent means "automatic." */
+    labelOverrides: Map<String, String>,
+    onSetLabelOverride: (address: String, override: String?) -> Unit,
+    /** Marks every one of these addresses read in one tap (Round 6),
+     *  without sending anything or moving them to S.R.B. Callers pass
+     *  whichever addresses are currently visible, so this naturally
+     *  respects the "Unread only" filter below. */
+    onMarkAllRead: (List<String>) -> Unit
 ) {
     var showActionSheet by rememberSaveable { mutableStateOf(false) }
     var showUnreadOnly by rememberSaveable { mutableStateOf(false) }
@@ -100,6 +113,18 @@ fun ConversationListScreen(
                     onClick = { showUnreadOnly = !showUnreadOnly },
                     label = { Text("Unread only") }
                 )
+                Spacer(Modifier.weight(1f))
+                val anyUnreadVisible = visibleConversations.any {
+                    unreadAddresses.contains(PhoneNumbers.normalize(it.address))
+                }
+                TextButton(
+                    onClick = { onMarkAllRead(visibleConversations.map { it.address }) },
+                    enabled = anyUnreadVisible
+                ) {
+                    Icon(Icons.Filled.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Mark all read")
+                }
             }
 
             if (conversations.isEmpty()) {
@@ -120,7 +145,9 @@ fun ConversationListScreen(
                             conversation = conversation,
                             selected = selectedAddresses.contains(conversation.address),
                             unread = unreadAddresses.contains(PhoneNumbers.normalize(conversation.address)),
-                            onToggle = { onToggleSelected(conversation) }
+                            labelOverride = labelOverrides[PhoneNumbers.normalize(conversation.address)],
+                            onToggle = { onToggleSelected(conversation) },
+                            onSetLabelOverride = { override -> onSetLabelOverride(conversation.address, override) }
                         )
                         HorizontalDivider()
                     }
@@ -143,8 +170,20 @@ fun ConversationListScreen(
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
-            title = { Text("Bulk SMS Reply Log") },
-            text = { Text("Version $APP_VERSION\n\n$APP_VERSION_NOTES") },
+            title = { Text("Bulk SMS Reply Log - $APP_VERSION") },
+            text = {
+                // Round 6: show the full history, not just the current
+                // version, so Mr. George can see what each past round added.
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    APP_VERSION_HISTORY.forEachIndexed { index, entry ->
+                        Text(entry.version, fontWeight = FontWeight.Bold)
+                        Text(entry.notes, style = MaterialTheme.typography.bodySmall)
+                        if (index != APP_VERSION_HISTORY.lastIndex) {
+                            Spacer(Modifier.height(10.dp))
+                        }
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = { showAboutDialog = false }) { Text("OK") }
             }
@@ -157,8 +196,14 @@ private fun ConversationRow(
     conversation: Conversation,
     selected: Boolean,
     unread: Boolean,
-    onToggle: () -> Unit
+    /** Mr. George's manual label choice for this number, if he's set one
+     *  (Round 6) - null means "automatic." */
+    labelOverride: String?,
+    onToggle: () -> Unit,
+    onSetLabelOverride: (String?) -> Unit
 ) {
+    var showLabelMenu by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -170,13 +215,15 @@ private fun ConversationRow(
         Column(modifier = Modifier.weight(1f)) {
             // Round 5: "RE: [label]" - a last name or business name found
             // in the message's own disclosure, or a Political/Commercial
-            // guess when it doesn't say one. Same logic used in the Log
-            // and Reports tabs (AttributionExtractor.reLabel).
-            val label = remember(conversation.lastMessageBody) {
-                AttributionExtractor.reLabel(conversation.lastMessageBody)
+            // guess when it doesn't say one. Round 6: Mr. George's manual
+            // override, if he's set one for this number, always wins over
+            // all of that. Same logic used in the Log and Reports tabs
+            // (AttributionExtractor.reLabel).
+            val label = remember(conversation.lastMessageBody, conversation.address, labelOverride) {
+                AttributionExtractor.reLabel(conversation.lastMessageBody, conversation.address, labelOverride)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, fontWeight = FontWeight.Bold)
+                Text(label, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
                 if (unread) {
                     Spacer(Modifier.width(6.dp))
                     Text(
@@ -185,6 +232,38 @@ private fun ConversationRow(
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )
+                }
+                Spacer(Modifier.width(4.dp))
+                Box {
+                    IconButton(
+                        onClick = { showLabelMenu = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Sell,
+                            contentDescription = "Set Political/Commercial/No label",
+                            modifier = Modifier.size(16.dp),
+                            // A filled-in color hints at a glance that this
+                            // number has a manual override set, rather than
+                            // the automatic guess.
+                            tint = if (labelOverride != null) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                    DropdownMenu(expanded = showLabelMenu, onDismissRequest = { showLabelMenu = false }) {
+                        AttributionExtractor.OVERRIDE_OPTIONS.forEach { (optionLabel, optionValue) ->
+                            DropdownMenuItem(
+                                text = { Text(optionLabel) },
+                                onClick = {
+                                    onSetLabelOverride(optionValue)
+                                    showLabelMenu = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
             Text(

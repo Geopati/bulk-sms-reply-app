@@ -15,14 +15,21 @@ data class MessageLogEntry(
      *  only - it is not the phone's real SMS read flag, and your native
      *  Messages app does not see it (see MessageLogDatabase.markThreadRead
      *  for why). */
-    val readLocally: Boolean = false
+    val readLocally: Boolean = false,
+    /** Mr. George's manual Political/Commercial/No-label choice for this
+     *  sender's number, if he's set one (Round 6) - one of
+     *  AttributionExtractor.OVERRIDE_POLITICAL/OVERRIDE_COMMERCIAL/
+     *  OVERRIDE_NONE, or null for "automatic." Looked up by normalized
+     *  address when this entry is loaded from the database. */
+    val labelOverride: String? = null
 ) {
     /** What to show as "who this was from": the "RE: ..." label (Round 5) -
      *  a last name or business name found in the message's own disclosure,
-     *  or a Political/Commercial guess when it doesn't say. See
+     *  a Political/Commercial guess when it doesn't say, or Mr. George's
+     *  own manual override (Round 6) when he's set one. See
      *  AttributionExtractor.reLabel for the priority order. */
     val senderLabel: String
-        get() = AttributionExtractor.reLabel(attribution, body)
+        get() = AttributionExtractor.reLabel(attribution, body, address, labelOverride)
 
     /** The key used to group this entry with others from the same
      *  real-world sender for the reports screen. Grouping by the RE: label

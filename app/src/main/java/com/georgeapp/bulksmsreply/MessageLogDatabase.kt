@@ -34,16 +34,33 @@ class MessageLogDatabase(context: Context) :
         )
         db.execSQL("CREATE INDEX idx_log_date ON $TABLE ($COL_SMS_DATE)")
         db.execSQL("CREATE INDEX idx_log_normalized_address ON $TABLE ($COL_NORMALIZED_ADDRESS)")
+        createOverrideTable(db)
+    }
+
+    private fun createOverrideTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS $TABLE_OVERRIDE (
+                $COL_OVERRIDE_ADDRESS TEXT PRIMARY KEY,
+                $COL_OVERRIDE_VALUE TEXT NOT NULL
+            )
+            """.trimIndent()
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Version 1 -> 2 added the "marked read in this app" column. Keep
-        // Mr. George's existing log data instead of wiping it when we can.
-        if (oldVersion < 2) {
+        // Version 1 -> 2 added the "marked read in this app" column, and
+        // 2 -> 3 added the manual label-override table (Round 6). Applied
+        // as additive steps so Mr. George's existing log data is kept
+        // instead of wiped, whichever old version he's upgrading from.
+        var version = oldVersion
+        if (version < 2) {
             db.execSQL("ALTER TABLE $TABLE ADD COLUMN $COL_READ_LOCALLY INTEGER NOT NULL DEFAULT 0")
-        } else {
-            db.execSQL("DROP TABLE IF EXISTS $TABLE")
-            onCreate(db)
+            version = 2
+        }
+        if (version < 3) {
+            createOverrideTable(db)
+            version = 3
         }
     }
 
@@ -135,6 +152,71 @@ class MessageLogDatabase(context: Context) :
         )
     }
 
+    /**
+     * Marks every one of [addresses] read as of [atMillis] in one
+     * transaction (Round 6's "Mark all read" button) - same effect as
+     * calling [markThreadRead] on each address, just faster for a batch.
+     */
+    fun markAllRead(addresses: List<String>, atMillis: Long) {
+        if (addresses.isEmpty()) return
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            for (address in addresses) {
+                val normalized = PhoneNumbers.normalize(address).ifEmpty { address }
+                val values = ContentValues().apply { put(COL_READ_LOCALLY, 1) }
+                db.update(
+                    TABLE,
+                    values,
+                    "$COL_NORMALIZED_ADDRESS = ? AND $COL_READ_LOCALLY = 0",
+                    arrayOf(normalized)
+                )
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /**
+     * Sets Mr. George's manual Political/Commercial/No-label choice for
+     * this number (Round 6) - one of AttributionExtractor.
+     * OVERRIDE_POLITICAL/OVERRIDE_COMMERCIAL/OVERRIDE_NONE. Pass null to
+     * clear it and go back to automatic detection.
+     */
+    fun setLabelOverride(address: String, override: String?) {
+        val normalized = PhoneNumbers.normalize(address).ifEmpty { address }
+        val db = writableDatabase
+        if (override == null) {
+            db.delete(TABLE_OVERRIDE, "$COL_OVERRIDE_ADDRESS = ?", arrayOf(normalized))
+        } else {
+            val values = ContentValues().apply {
+                put(COL_OVERRIDE_ADDRESS, normalized)
+                put(COL_OVERRIDE_VALUE, override)
+            }
+            db.insertWithOnConflict(TABLE_OVERRIDE, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        }
+    }
+
+    /** All of Mr. George's manual label overrides, normalized address ->
+     *  override value, for applying to every screen that shows a sender
+     *  label. Loaded once per refresh rather than queried per-row. */
+    fun labelOverrides(): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        readableDatabase.query(
+            TABLE_OVERRIDE,
+            arrayOf(COL_OVERRIDE_ADDRESS, COL_OVERRIDE_VALUE),
+            null, null, null, null, null
+        ).use { cursor ->
+            val addressIdx = cursor.getColumnIndexOrThrow(COL_OVERRIDE_ADDRESS)
+            val valueIdx = cursor.getColumnIndexOrThrow(COL_OVERRIDE_VALUE)
+            while (cursor.moveToNext()) {
+                result[cursor.getString(addressIdx)] = cursor.getString(valueIdx)
+            }
+        }
+        return result
+    }
+
     /** Normalized addresses that still have at least one message this app
      *  hasn't marked read yet - used to show an "unread" indicator on the
      *  Messages tab. */
@@ -170,7 +252,10 @@ class MessageLogDatabase(context: Context) :
         val attribution: String?,
         val body: String,
         val action: String,
-        val actionAtMillis: Long
+        val actionAtMillis: Long,
+        /** Mr. George's manual label override for this number, if any
+         *  (Round 6) - see MessageLogEntry.labelOverride. */
+        val labelOverride: String? = null
     )
 
     /**
@@ -180,6 +265,7 @@ class MessageLogDatabase(context: Context) :
      * existing action/action_at columns - no schema change needed.
      */
     fun processedConversations(): List<ProcessedConversation> {
+        val overrides = labelOverrides()
         val sql = """
             SELECT $COL_NORMALIZED_ADDRESS, $COL_ADDRESS, $COL_ATTRIBUTION, $COL_BODY, $COL_ACTION, $COL_ACTION_AT
             FROM $TABLE m1
@@ -200,14 +286,16 @@ class MessageLogDatabase(context: Context) :
             val actionIdx = cursor.getColumnIndexOrThrow(COL_ACTION)
             val actionAtIdx = cursor.getColumnIndexOrThrow(COL_ACTION_AT)
             while (cursor.moveToNext()) {
+                val normalizedAddress = cursor.getString(normalizedIdx)
                 result.add(
                     ProcessedConversation(
-                        normalizedAddress = cursor.getString(normalizedIdx),
+                        normalizedAddress = normalizedAddress,
                         address = cursor.getString(addressIdx),
                         attribution = if (cursor.isNull(attributionIdx)) null else cursor.getString(attributionIdx),
                         body = cursor.getString(bodyIdx),
                         action = cursor.getString(actionIdx),
-                        actionAtMillis = cursor.getLong(actionAtIdx)
+                        actionAtMillis = cursor.getLong(actionAtIdx),
+                        labelOverride = overrides[normalizedAddress]
                     )
                 )
             }
@@ -237,6 +325,7 @@ class MessageLogDatabase(context: Context) :
             whereArgs.add(like)
         }
 
+        val overrides = labelOverrides()
         return readableDatabase.query(
             TABLE,
             null,
@@ -245,7 +334,7 @@ class MessageLogDatabase(context: Context) :
             null, null,
             "$COL_SMS_DATE DESC",
             limit.toString()
-        ).use { cursor -> cursor.toEntries() }
+        ).use { cursor -> cursor.toEntries(overrides) }
     }
 
     /** All logged messages since [sinceMillis] (or all time if null), for
@@ -253,12 +342,13 @@ class MessageLogDatabase(context: Context) :
     fun allForReports(sinceMillis: Long?): List<MessageLogEntry> {
         val where = sinceMillis?.let { "$COL_SMS_DATE >= ?" }
         val args = sinceMillis?.let { arrayOf(it.toString()) }
+        val overrides = labelOverrides()
         return readableDatabase.query(
             TABLE, null, where, args, null, null, "$COL_SMS_DATE DESC"
-        ).use { cursor -> cursor.toEntries() }
+        ).use { cursor -> cursor.toEntries(overrides) }
     }
 
-    private fun android.database.Cursor.toEntries(): List<MessageLogEntry> {
+    private fun android.database.Cursor.toEntries(overrides: Map<String, String> = emptyMap()): List<MessageLogEntry> {
         val entries = mutableListOf<MessageLogEntry>()
         val idIdx = getColumnIndexOrThrow(COL_ID)
         val dateIdx = getColumnIndexOrThrow(COL_SMS_DATE)
@@ -271,17 +361,19 @@ class MessageLogDatabase(context: Context) :
         val readLocallyIdx = getColumnIndexOrThrow(COL_READ_LOCALLY)
 
         while (moveToNext()) {
+            val normalizedAddress = getString(normalizedIdx)
             entries.add(
                 MessageLogEntry(
                     id = getLong(idIdx),
                     smsDateMillis = getLong(dateIdx),
                     address = getString(addressIdx),
-                    normalizedAddress = getString(normalizedIdx),
+                    normalizedAddress = normalizedAddress,
                     attribution = if (isNull(attributionIdx)) null else getString(attributionIdx),
                     body = getString(bodyIdx),
                     action = if (isNull(actionIdx)) null else getString(actionIdx),
                     actionAtMillis = if (isNull(actionAtIdx)) null else getLong(actionAtIdx),
-                    readLocally = getInt(readLocallyIdx) != 0
+                    readLocally = getInt(readLocallyIdx) != 0,
+                    labelOverride = overrides[normalizedAddress]
                 )
             )
         }
@@ -290,7 +382,7 @@ class MessageLogDatabase(context: Context) :
 
     companion object {
         private const val DB_NAME = "message_log.db"
-        private const val DB_VERSION = 2
+        private const val DB_VERSION = 3
         private const val TABLE = "message_log"
         private const val COL_ID = "id"
         private const val COL_SMS_DATE = "sms_date"
@@ -301,5 +393,8 @@ class MessageLogDatabase(context: Context) :
         private const val COL_ACTION = "action"
         private const val COL_ACTION_AT = "action_at"
         private const val COL_READ_LOCALLY = "read_locally"
+        private const val TABLE_OVERRIDE = "label_override"
+        private const val COL_OVERRIDE_ADDRESS = "normalized_address"
+        private const val COL_OVERRIDE_VALUE = "override"
     }
 }

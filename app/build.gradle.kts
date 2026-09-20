@@ -12,8 +12,8 @@ android {
         minSdk = 26
         targetSdk = 34
         // Kept in step with AppInfo.kt's APP_VERSION (Round N = version 1.N).
-        versionCode = 2
-        versionName = "1.5.0"
+        versionCode = 3
+        versionName = "1.6.0"
     }
 
     signingConfigs {

@@ -13,13 +13,35 @@ package com.georgeapp.bulksmsreply
  *   1. A last name (or two) found in the disclosure -> "RE: Smith"
  *   2. A business/committee name if no personal name found -> "RE: Acme Corp"
  *   3. Neither found -> a content-based guess: "RE: Political" or "RE: Commercial"
+ *   4. A manual override (Round 6), if Mr. George has set one for this
+ *      number - always wins over all three tiers above, since at that
+ *      point he's deliberately taking control of the label himself.
  *
  * This is intentionally simple pattern matching, not a legal or factual
  * verification of who actually sent something, and not machine learning -
  * it's best-effort, and will occasionally miss a name/business or guess
  * the wrong fallback category on an unusually worded or ambiguous text.
+ * The manual override (Round 6) exists specifically so Mr. George can
+ * correct a wrong Political/Commercial guess himself, permanently, for a
+ * given number.
  */
 object AttributionExtractor {
+
+    /** The three values a manual label override can hold, stored as-is in
+     *  the database. Absence of a stored value (null) means "automatic" -
+     *  use the tiered detection below, same as before Round 6. */
+    const val OVERRIDE_POLITICAL = "POLITICAL"
+    const val OVERRIDE_COMMERCIAL = "COMMERCIAL"
+    const val OVERRIDE_NONE = "NONE"
+
+    /** Options shown in the manual-override menu, in display order,
+     *  paired with the value [reLabel] expects (null = "Automatic"). */
+    val OVERRIDE_OPTIONS: List<Pair<String, String?>> = listOf(
+        "Automatic" to null,
+        "Political" to OVERRIDE_POLITICAL,
+        "Commercial" to OVERRIDE_COMMERCIAL,
+        "No label" to OVERRIDE_NONE
+    )
 
     // Ordered by how strongly they indicate a real disclosure - first
     // match wins. Each pattern captures the name/organization that follows
@@ -62,16 +84,26 @@ object AttributionExtractor {
     private val PERSONAL_NAME_PATTERN =
         Regex("\\b([A-Z][a-zA-Z'-]{1,20})\\s+([A-Z][a-zA-Z'-]{1,20})\\b")
 
+    // Expanded in Round 6 (Mr. George found the original lists too easily
+    // misclassified messages) - still a plain keyword count, just a wider
+    // net on both sides. The manual override below is the real fix for
+    // any individual number this still gets wrong.
     private val POLITICAL_KEYWORDS = listOf(
         "vote", "election", "campaign", "candidate", "senator", "congress",
         "president", "poll", "ballot", "donate", "contribute", "pac",
         "committee", "governor", "mayor", "primary", "republican",
-        "democrat", "party", "elect"
+        "democrat", "party", "elect", "voters", "grassroots", "endorse",
+        "endorsed", "constituents", "legislature", "legislation",
+        "district", "assembly", "gop", "chip in", "matched 3x",
+        "fellow american", "flip the"
     )
     private val COMMERCIAL_KEYWORDS = listOf(
         "order", "sale", "discount", "% off", "coupon", "shop", "store",
         "offer", "deal", "subscription", "cart", "shipping", "delivery",
-        "promo", "free trial", "unsubscribe", "code", "save"
+        "promo", "free trial", "unsubscribe", "code", "save", "reply stop",
+        "text stop", "limited time", "exclusive", "rewards", "clearance",
+        "flash sale", "checkout", "your order", "tracking", "confirm your",
+        "gift card", "new arrivals", "member price"
     )
 
     /**
@@ -94,8 +126,24 @@ object AttributionExtractor {
      * Reports). [rawAttribution] should be the result of [extract] on the
      * same message when already available (e.g. from a stored log row) -
      * pass null to have this look it up from [messageBody] itself.
+     *
+     * [address] is shown as-is when [override] is [OVERRIDE_NONE] ("no
+     * label" - Round 6). [override] is one of [OVERRIDE_POLITICAL],
+     * [OVERRIDE_COMMERCIAL], [OVERRIDE_NONE], or null for "automatic" (the
+     * tiered detection below, same as before Round 6) - when set, it wins
+     * over everything else, including a real name/business we did find.
      */
-    fun reLabel(rawAttribution: String?, messageBody: String): String {
+    fun reLabel(
+        rawAttribution: String?,
+        messageBody: String,
+        address: String,
+        override: String? = null
+    ): String {
+        when (override) {
+            OVERRIDE_POLITICAL -> return "RE: Political"
+            OVERRIDE_COMMERCIAL -> return "RE: Commercial"
+            OVERRIDE_NONE -> return address
+        }
         val disclosure = rawAttribution ?: extract(messageBody)
         if (!disclosure.isNullOrBlank()) {
             lastNamesFrom(disclosure)?.let { return "RE: $it" }
@@ -104,8 +152,10 @@ object AttributionExtractor {
         return "RE: ${classifyPoliticalOrCommercial(messageBody)}"
     }
 
-    /** Convenience overload when only the message body is on hand. */
-    fun reLabel(messageBody: String): String = reLabel(extract(messageBody), messageBody)
+    /** Convenience overload when only the message body is on hand (no
+     *  already-extracted disclosure to reuse). */
+    fun reLabel(messageBody: String, address: String, override: String? = null): String =
+        reLabel(extract(messageBody), messageBody, address, override)
 
     /** Tier 1: last name(s) found in the disclosure text, e.g. "Smith" or
      *  "Smith/Jones" for two. Null if nothing name-shaped was found. */

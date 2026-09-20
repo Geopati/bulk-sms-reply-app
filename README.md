@@ -52,6 +52,17 @@ bigger goal of a publishable app.
   - Once you apply a bulk action to a conversation, it moves out of this
     tab entirely and into **S.R.B.** (see below) - it can no longer be
     accidentally selected and re-processed a second time.
+  - A **"Mark all read"** button (Round 6) clears the UNREAD tag on every
+    conversation currently shown - if the "Unread only" chip is on, it
+    only marks what's currently filtered in. Nothing is sent and nothing
+    moves to S.R.B.; it's a pure decluttering shortcut.
+  - Each row also has a small tag icon (Round 6) next to its `RE:` label -
+    tap it to manually set that number's label to Political, Commercial,
+    or No label (just shows the phone number), or back to Automatic. Your
+    choice is remembered and applies everywhere that number shows up
+    (Messages, Log, Reports, S.R.B.) until you change it again. The icon
+    fills in with color when a manual choice is active, so you can tell
+    at a glance which numbers you've corrected.
 - **S.R.B.** (Stop / Report / Block) - new in Round 5. Every conversation
   you've already applied a bulk action to lives here instead of in
   Messages, each showing which action(s) were taken (Replied / Reported /
@@ -97,18 +108,27 @@ worked out in this order from the message text:
    names a company (e.g. "Authorized by Acme Corp" -> `RE: Acme Corp`).
 3. **A best guess of "Political" or "Commercial"**, if neither a name nor
    a business turned up, based on which of those two categories the
-   message's own wording leans toward.
+   message's own wording leans toward (the keyword list behind this guess
+   was widened in Round 6 for better accuracy, but it's still a guess).
 
 This is a plain keyword/pattern heuristic, not machine learning, so it
 will sometimes mislabel or miss - it's meant as a quick at-a-glance sort,
-not a certified attribution.
+not a certified attribution. **If it gets one wrong (Round 6):** tap the
+small tag icon next to that conversation's label on the Messages tab and
+pick Political, Commercial, or No label yourself. That choice is saved
+and always wins over the automatic guess for that number from then on,
+everywhere it appears in the app - pick "Automatic" from the same menu
+to go back to letting the app guess again.
 
 ## Versioning
 
 Starting with Round 5, the app's version number follows its build round:
-Round *N* is version `1.N` (so Round 5 is v1.5, Round 6 will be v1.6, and
-so on). The current version and a short note on what changed are shown in
-the app itself via the (i) info icon on the Messages tab's top bar.
+Round *N* is version `1.N` (so Round 5 is v1.5, Round 6 is v1.6, and so
+on). The current version, and a full history of what every past round
+added, are shown in the app itself via the (i) info icon on the Messages
+tab's top bar (that history was made retroactive in Round 6, covering
+v1.1 onward - see the note in `AppInfo.kt` for the one honest caveat on
+that).
 
 ## Building and installing it (for personal/sideloaded use)
 

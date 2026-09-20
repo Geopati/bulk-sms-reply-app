@@ -66,7 +66,12 @@ private fun SrbRow(conversation: MessageLogDatabase.ProcessedConversation) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                AttributionExtractor.reLabel(conversation.attribution, conversation.body),
+                AttributionExtractor.reLabel(
+                    conversation.attribution,
+                    conversation.body,
+                    conversation.address,
+                    conversation.labelOverride
+                ),
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
