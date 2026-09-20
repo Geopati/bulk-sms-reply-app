@@ -165,6 +165,16 @@ private fun AppRoot(
         }
     }
 
+    // Round 7: one shared handler for the label-override tag icon, now
+    // used by every tab (Messages/S.R.B./Log/Reports) instead of only
+    // Messages - see ui/LabelTag.kt for why that mattered. Defined once
+    // here so all four call sites below stay wired to the exact same
+    // logic and can't drift apart from each other.
+    val setLabelOverride: (String, String?) -> Unit = { address, override ->
+        messageLogDatabase.setLabelOverride(address, override)
+        refreshTrigger += 1
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
@@ -259,10 +269,7 @@ private fun AppRoot(
                             refreshTrigger += 1
                         },
                         labelOverrides = labelOverrides,
-                        onSetLabelOverride = { address, override ->
-                            messageLogDatabase.setLabelOverride(address, override)
-                            refreshTrigger += 1
-                        },
+                        onSetLabelOverride = setLabelOverride,
                         onMarkAllRead = { addresses ->
                             messageLogDatabase.markAllRead(addresses, System.currentTimeMillis())
                             snackbarMessage = "Marked ${addresses.size} conversation${if (addresses.size == 1) "" else "s"} as read."
@@ -270,20 +277,25 @@ private fun AppRoot(
                         }
                     )
 
-                    AppTab.SRB -> SrbScreen(processed = processedConversations)
+                    AppTab.SRB -> SrbScreen(
+                        processed = processedConversations,
+                        onSetLabelOverride = setLabelOverride
+                    )
 
                     AppTab.LOG -> LogScreen(
                         entries = logEntries,
                         searchText = logSearchText,
                         onSearchTextChange = { logSearchText = it },
                         selectedRangeDays = logRangeDays,
-                        onRangeSelected = { logRangeDays = it }
+                        onRangeSelected = { logRangeDays = it },
+                        onSetLabelOverride = setLabelOverride
                     )
 
                     AppTab.REPORTS -> ReportsScreen(
                         selectedPeriod = reportPeriod,
                         onPeriodSelected = { reportPeriod = it },
-                        buckets = reportBuckets
+                        buckets = reportBuckets,
+                        onSetLabelOverride = setLabelOverride
                     )
                 }
             }

@@ -11,9 +11,13 @@ android {
         applicationId = "com.georgeapp.bulksmsreply"
         minSdk = 26
         targetSdk = 34
-        // Kept in step with AppInfo.kt's APP_VERSION (Round N = version 1.N).
-        versionCode = 3
-        versionName = "1.6.0"
+        // Kept in step with AppInfo.kt's APP_VERSION. Versioning rescaled
+        // 2026-09-21 (multiplied by .1, same per-round increment continued)
+        // so the app reads as pre-1.0/still-in-development - see the note
+        // atop AppInfo.kt. versionCode is unaffected by this and simply
+        // keeps incrementing by 1 each round, same as always.
+        versionCode = 4
+        versionName = "0.17.0"
     }
 
     signingConfigs {

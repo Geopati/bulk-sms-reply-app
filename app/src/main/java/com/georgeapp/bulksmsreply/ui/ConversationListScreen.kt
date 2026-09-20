@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Report
-import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -202,8 +201,6 @@ private fun ConversationRow(
     onToggle: () -> Unit,
     onSetLabelOverride: (String?) -> Unit
 ) {
-    var showLabelMenu by remember { mutableStateOf(false) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -234,37 +231,13 @@ private fun ConversationRow(
                     )
                 }
                 Spacer(Modifier.width(4.dp))
-                Box {
-                    IconButton(
-                        onClick = { showLabelMenu = true },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            Icons.Filled.Sell,
-                            contentDescription = "Set Political/Commercial/No label",
-                            modifier = Modifier.size(16.dp),
-                            // A filled-in color hints at a glance that this
-                            // number has a manual override set, rather than
-                            // the automatic guess.
-                            tint = if (labelOverride != null) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    }
-                    DropdownMenu(expanded = showLabelMenu, onDismissRequest = { showLabelMenu = false }) {
-                        AttributionExtractor.OVERRIDE_OPTIONS.forEach { (optionLabel, optionValue) ->
-                            DropdownMenuItem(
-                                text = { Text(optionLabel) },
-                                onClick = {
-                                    onSetLabelOverride(optionValue)
-                                    showLabelMenu = false
-                                }
-                            )
-                        }
-                    }
-                }
+                // Round 7: the tag icon + menu now lives in one shared
+                // composable (LabelTag.kt) used by every tab that shows a
+                // sender label, not just this one - see that file for why.
+                LabelTagButton(
+                    labelOverride = labelOverride,
+                    onSetLabelOverride = onSetLabelOverride
+                )
             }
             Text(
                 conversation.address,

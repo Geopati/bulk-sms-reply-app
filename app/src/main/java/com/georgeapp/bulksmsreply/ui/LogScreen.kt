@@ -39,7 +39,8 @@ fun LogScreen(
     searchText: String,
     onSearchTextChange: (String) -> Unit,
     selectedRangeDays: Int?,
-    onRangeSelected: (Int?) -> Unit
+    onRangeSelected: (Int?) -> Unit,
+    onSetLabelOverride: (address: String, override: String?) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -94,7 +95,10 @@ fun LogScreen(
         } else {
             LazyColumn {
                 items(entries, key = { it.id }) { entry ->
-                    LogRow(entry)
+                    LogRow(
+                        entry = entry,
+                        onSetLabelOverride = { override -> onSetLabelOverride(entry.address, override) }
+                    )
                     HorizontalDivider()
                 }
             }
@@ -103,13 +107,31 @@ fun LogScreen(
 }
 
 @Composable
-private fun LogRow(entry: MessageLogEntry) {
+private fun LogRow(entry: MessageLogEntry, onSetLabelOverride: (String?) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
-            Text(entry.senderLabel, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text(
+                    entry.senderLabel,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(Modifier.width(4.dp))
+                // Round 7: lets Mr. George correct a wrong label right from
+                // the Log tab, not only the fleeting moment before a
+                // conversation is processed - see LabelTag.kt for why.
+                LabelTagButton(
+                    labelOverride = entry.labelOverride,
+                    onSetLabelOverride = onSetLabelOverride
+                )
+            }
             Text(
                 DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                     .format(Date(entry.smsDateMillis)),

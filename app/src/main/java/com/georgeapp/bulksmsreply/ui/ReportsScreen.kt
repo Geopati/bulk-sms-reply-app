@@ -41,7 +41,8 @@ private val URL_PATTERN = Regex("(https?://[\\w\\-.~:/?#\\[\\]@!$&'()*+,;=%]+)")
 fun ReportsScreen(
     selectedPeriod: ReportPeriod,
     onPeriodSelected: (ReportPeriod) -> Unit,
-    buckets: List<PeriodBucket>
+    buckets: List<PeriodBucket>,
+    onSetLabelOverride: (address: String, override: String?) -> Unit
 ) {
     val context = LocalContext.current
     // Which sender rows are expanded, keyed by bucket + sender label so
@@ -103,7 +104,8 @@ fun ReportsScreen(
                             } else {
                                 expandedKeys + key
                             }
-                        }
+                        },
+                        onSetLabelOverride = onSetLabelOverride
                     )
                     Spacer(Modifier.height(10.dp))
                 }
@@ -116,7 +118,8 @@ fun ReportsScreen(
 private fun BucketCard(
     bucket: PeriodBucket,
     expandedKeys: Set<String>,
-    onToggleSender: (String) -> Unit
+    onToggleSender: (String) -> Unit,
+    onSetLabelOverride: (address: String, override: String?) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -134,7 +137,8 @@ private fun BucketCard(
                 SenderRow(
                     sender = sender,
                     expanded = expandedKeys.contains(key),
-                    onToggle = { onToggleSender(key) }
+                    onToggle = { onToggleSender(key) },
+                    onSetLabelOverride = onSetLabelOverride
                 )
             }
             val remaining = bucket.bySender.size - shown.size
@@ -149,7 +153,12 @@ private fun BucketCard(
 }
 
 @Composable
-private fun SenderRow(sender: SenderCount, expanded: Boolean, onToggle: () -> Unit) {
+private fun SenderRow(
+    sender: SenderCount,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onSetLabelOverride: (address: String, override: String?) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -171,7 +180,10 @@ private fun SenderRow(sender: SenderCount, expanded: Boolean, onToggle: () -> Un
         if (expanded) {
             Column(modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)) {
                 sender.messages.forEach { message ->
-                    ExpandedMessageRow(message)
+                    ExpandedMessageRow(
+                        message = message,
+                        onSetLabelOverride = { override -> onSetLabelOverride(message.address, override) }
+                    )
                     Spacer(Modifier.height(6.dp))
                 }
             }
@@ -180,7 +192,7 @@ private fun SenderRow(sender: SenderCount, expanded: Boolean, onToggle: () -> Un
 }
 
 @Composable
-private fun ExpandedMessageRow(message: MessageLogEntry) {
+private fun ExpandedMessageRow(message: MessageLogEntry, onSetLabelOverride: (String?) -> Unit) {
     val context = LocalContext.current
     Column(
         modifier = Modifier
@@ -188,11 +200,31 @@ private fun ExpandedMessageRow(message: MessageLogEntry) {
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(8.dp)
     ) {
-        Text(
-            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                .format(Date(message.smsDateMillis)),
-            style = MaterialTheme.typography.labelSmall
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                        .format(Date(message.smsDateMillis)),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    message.address,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // Round 7: lets Mr. George fix this specific number's label
+            // right from the expanded report row - see LabelTag.kt for why
+            // this needed to exist on every screen, not only Messages.
+            LabelTagButton(
+                labelOverride = message.labelOverride,
+                onSetLabelOverride = onSetLabelOverride
+            )
+        }
         Text(message.body, style = MaterialTheme.typography.bodySmall)
 
         val urls = remember(message.body) { URL_PATTERN.findAll(message.body).map { it.value }.toList() }

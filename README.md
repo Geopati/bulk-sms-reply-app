@@ -62,7 +62,11 @@ bigger goal of a publishable app.
     choice is remembered and applies everywhere that number shows up
     (Messages, Log, Reports, S.R.B.) until you change it again. The icon
     fills in with color when a manual choice is active, so you can tell
-    at a glance which numbers you've corrected.
+    at a glance which numbers you've corrected. **As of Round 7, this same
+    tag icon is on every tab that shows a label** (S.R.B., Log, and
+    Reports too) - not just Messages, so you can fix a wrong guess
+    wherever you actually notice it, including after a conversation has
+    already been processed and moved to S.R.B.
 - **S.R.B.** (Stop / Report / Block) - new in Round 5. Every conversation
   you've already applied a bulk action to lives here instead of in
   Messages, each showing which action(s) were taken (Replied / Reported /
@@ -113,22 +117,36 @@ worked out in this order from the message text:
 
 This is a plain keyword/pattern heuristic, not machine learning, so it
 will sometimes mislabel or miss - it's meant as a quick at-a-glance sort,
-not a certified attribution. **If it gets one wrong (Round 6):** tap the
-small tag icon next to that conversation's label on the Messages tab and
+not a certified attribution. **If it gets one wrong:** tap the small tag
+icon next to that conversation's label - **as of Round 7, this works on
+every tab** (Messages, S.R.B., Log, and Reports), not only Messages - and
 pick Political, Commercial, or No label yourself. That choice is saved
 and always wins over the automatic guess for that number from then on,
 everywhere it appears in the app - pick "Automatic" from the same menu
-to go back to letting the app guess again.
+to go back to letting the app guess again. (Round 6 introduced this
+override but only wired it up on the Messages tab, which meant a
+conversation lost that option the moment a bulk action moved it to
+S.R.B. - Round 7 fixes that gap.)
 
 ## Versioning
 
-Starting with Round 5, the app's version number follows its build round:
-Round *N* is version `1.N` (so Round 5 is v1.5, Round 6 is v1.6, and so
-on). The current version, and a full history of what every past round
-added, are shown in the app itself via the (i) info icon on the Messages
-tab's top bar (that history was made retroactive in Round 6, covering
-v1.1 onward - see the note in `AppInfo.kt` for the one honest caveat on
-that).
+Starting with Round 5, the app's version number followed its build round:
+Round *N* was version `1.N` (Round 5 = v1.5, Round 6 = v1.6). **As of
+Round 7 (2026-09-21), every version number has been rescaled** - multiply
+by .1, i.e. shift the decimal point one place left - and the same
+per-round increment continues from there, so Round *N* is now version
+`0.1 + 0.01*N` (Round 6 = v0.16, Round 7 = v0.17, and so on). Mr. George
+asked for this because the old scheme already implied a "past 1.0, done"
+release starting from Round 1, which wasn't the intent - he doesn't want
+the app to reach v1.0 until he's satisfied it's ready, and this rescale
+buys roughly 90 more rounds of runway before the numbering would reach
+v1.00 on its own. Nothing about what any past round *did* has changed,
+only its number (v1.6 and v0.16 are the exact same Round 6). The current
+version, and a full history of what every past round added, are shown in
+the app itself via the (i) info icon on the Messages tab's top bar (that
+history was made retroactive in Round 6 and renumbered again in Round 7 -
+see the note in `AppInfo.kt` for the full explanation and honest
+caveats).
 
 ## Building and installing it (for personal/sideloaded use)
 
@@ -237,6 +255,9 @@ project than this MVP, tracked separately in the project notes.
   - `CsvExporter.kt` - shares the Log/Reports tabs as CSV files
   - `AppInfo.kt` - the app version shown in the About dialog
   - `ui/` - Compose screens (`ConversationListScreen.kt`, `SrbScreen.kt`,
-    `LogScreen.kt`, `ReportsScreen.kt`, `Theme.kt`)
+    `LogScreen.kt`, `ReportsScreen.kt`, `Theme.kt`) plus `LabelTag.kt`
+    (Round 7) - the shared tag-icon/override-menu composable all four
+    screens use, so the label-correction control can't drift out of sync
+    between them the way Round 6's MainActivity/screen pairing once did
 - `app/src/main/res/` - app icon, strings, theme, and the FileProvider's
   `xml/file_paths.xml` (needed for CSV export/sharing)

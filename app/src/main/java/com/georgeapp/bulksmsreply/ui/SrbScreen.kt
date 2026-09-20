@@ -27,9 +27,17 @@ import java.util.Date
  * the action locally (sent the reply, added the block, forwarded the spam
  * report) - it is not a delivery receipt from the carrier or the number
  * being texted, which Android has no way to give this app.
+ *
+ * Round 7 (2026-09-21): each row now also has the tag icon so Mr. George
+ * can fix a wrong label here too - previously the override control only
+ * existed on the Messages tab, so a conversation lost that option the
+ * moment it was processed and moved here, which is what he ran into.
  */
 @Composable
-fun SrbScreen(processed: List<MessageLogDatabase.ProcessedConversation>) {
+fun SrbScreen(
+    processed: List<MessageLogDatabase.ProcessedConversation>,
+    onSetLabelOverride: (address: String, override: String?) -> Unit
+) {
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         Text(
             "Stop / Report / Block",
@@ -50,7 +58,10 @@ fun SrbScreen(processed: List<MessageLogDatabase.ProcessedConversation>) {
         } else {
             LazyColumn {
                 items(processed, key = { it.normalizedAddress }) { conversation ->
-                    SrbRow(conversation)
+                    SrbRow(
+                        conversation = conversation,
+                        onSetLabelOverride = { override -> onSetLabelOverride(conversation.address, override) }
+                    )
                     HorizontalDivider()
                 }
             }
@@ -59,22 +70,36 @@ fun SrbScreen(processed: List<MessageLogDatabase.ProcessedConversation>) {
 }
 
 @Composable
-private fun SrbRow(conversation: MessageLogDatabase.ProcessedConversation) {
+private fun SrbRow(
+    conversation: MessageLogDatabase.ProcessedConversation,
+    onSetLabelOverride: (String?) -> Unit
+) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                AttributionExtractor.reLabel(
-                    conversation.attribution,
-                    conversation.body,
-                    conversation.address,
-                    conversation.labelOverride
-                ),
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    AttributionExtractor.reLabel(
+                        conversation.attribution,
+                        conversation.body,
+                        conversation.address,
+                        conversation.labelOverride
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(Modifier.width(4.dp))
+                LabelTagButton(
+                    labelOverride = conversation.labelOverride,
+                    onSetLabelOverride = onSetLabelOverride
+                )
+            }
             Text(
                 DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                     .format(Date(conversation.actionAtMillis)),
