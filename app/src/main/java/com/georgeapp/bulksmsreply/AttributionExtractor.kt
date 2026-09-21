@@ -13,9 +13,12 @@ package com.georgeapp.bulksmsreply
  *   1. A last name (or two) found in the disclosure -> "RE: Smith"
  *   2. A business/committee name if no personal name found -> "RE: Acme Corp"
  *   3. Neither found -> a content-based guess: "RE: Political" or "RE: Commercial"
- *   4. A manual override (Round 6), if Mr. George has set one for this
- *      number - always wins over all three tiers above, since at that
- *      point he's deliberately taking control of the label himself.
+ *      (Round 8: skipped when [guessingEnabled] is false - see that
+ *      parameter's note)
+ *   4. A manual override (Round 6: Political/Commercial/No label; Round 8
+ *      added Personal/Other), if Mr. George has set one for this number -
+ *      always wins over all three tiers above, since at that point he's
+ *      deliberately taking control of the label himself.
  *
  * This is intentionally simple pattern matching, not a legal or factual
  * verification of who actually sent something, and not machine learning -
@@ -27,11 +30,15 @@ package com.georgeapp.bulksmsreply
  */
 object AttributionExtractor {
 
-    /** The three values a manual label override can hold, stored as-is in
-     *  the database. Absence of a stored value (null) means "automatic" -
-     *  use the tiered detection below, same as before Round 6. */
+    /** The values a manual label override can hold, stored as-is in the
+     *  database. Absence of a stored value (null) means "automatic" - use
+     *  the tiered detection below, same as before Round 6. Personal and
+     *  Other were added in Round 8 at Mr. George's request, for contacts
+     *  the automatic Political/Commercial guess was never meant to catch. */
     const val OVERRIDE_POLITICAL = "POLITICAL"
     const val OVERRIDE_COMMERCIAL = "COMMERCIAL"
+    const val OVERRIDE_PERSONAL = "PERSONAL"
+    const val OVERRIDE_OTHER = "OTHER"
     const val OVERRIDE_NONE = "NONE"
 
     /** Options shown in the manual-override menu, in display order,
@@ -40,6 +47,8 @@ object AttributionExtractor {
         "Automatic" to null,
         "Political" to OVERRIDE_POLITICAL,
         "Commercial" to OVERRIDE_COMMERCIAL,
+        "Personal" to OVERRIDE_PERSONAL,
+        "Other" to OVERRIDE_OTHER,
         "No label" to OVERRIDE_NONE
     )
 
@@ -97,11 +106,16 @@ object AttributionExtractor {
         "district", "assembly", "gop", "chip in", "matched 3x",
         "fellow american", "flip the"
     )
+    // Round 8: removed "reply stop"/"text stop" - that's shared opt-out
+    // boilerplate required on almost any bulk text (political ones
+    // included), not evidence of a commercial message. Leaving them in
+    // was quietly dragging political texts toward a false Commercial
+    // guess whenever the disclosure line itself wasn't recognized.
     private val COMMERCIAL_KEYWORDS = listOf(
         "order", "sale", "discount", "% off", "coupon", "shop", "store",
         "offer", "deal", "subscription", "cart", "shipping", "delivery",
-        "promo", "free trial", "unsubscribe", "code", "save", "reply stop",
-        "text stop", "limited time", "exclusive", "rewards", "clearance",
+        "promo", "free trial", "unsubscribe", "code", "save",
+        "limited time", "exclusive", "rewards", "clearance",
         "flash sale", "checkout", "your order", "tracking", "confirm your",
         "gift card", "new arrivals", "member price"
     )
@@ -129,19 +143,32 @@ object AttributionExtractor {
      *
      * [address] is shown as-is when [override] is [OVERRIDE_NONE] ("no
      * label" - Round 6). [override] is one of [OVERRIDE_POLITICAL],
-     * [OVERRIDE_COMMERCIAL], [OVERRIDE_NONE], or null for "automatic" (the
-     * tiered detection below, same as before Round 6) - when set, it wins
-     * over everything else, including a real name/business we did find.
+     * [OVERRIDE_COMMERCIAL], [OVERRIDE_PERSONAL], [OVERRIDE_OTHER],
+     * [OVERRIDE_NONE] (Round 8 added the middle two), or null for
+     * "automatic" (the tiered detection below, same as before Round 6) -
+     * when set, it wins over everything else, including a real
+     * name/business we did find.
+     *
+     * [guessingEnabled] (Round 8, default true) is Mr. George's app-wide
+     * opt-out toggle for tier 3 (the content-based Political/Commercial
+     * guess) only - see AppSettings.automaticGuessingEnabled. When false
+     * and neither a manual override nor a real name/business was found,
+     * this falls back to showing [address] (same as "No label") instead
+     * of guessing a category, since he specifically asked to be able to
+     * turn guessing off without losing any label a number already has.
      */
     fun reLabel(
         rawAttribution: String?,
         messageBody: String,
         address: String,
-        override: String? = null
+        override: String? = null,
+        guessingEnabled: Boolean = true
     ): String {
         when (override) {
             OVERRIDE_POLITICAL -> return "RE: Political"
             OVERRIDE_COMMERCIAL -> return "RE: Commercial"
+            OVERRIDE_PERSONAL -> return "RE: Personal"
+            OVERRIDE_OTHER -> return "RE: Other"
             OVERRIDE_NONE -> return address
         }
         val disclosure = rawAttribution ?: extract(messageBody)
@@ -149,13 +176,19 @@ object AttributionExtractor {
             lastNamesFrom(disclosure)?.let { return "RE: $it" }
             businessNameFrom(disclosure)?.let { return "RE: $it" }
         }
+        if (!guessingEnabled) return address
         return "RE: ${classifyPoliticalOrCommercial(messageBody)}"
     }
 
     /** Convenience overload when only the message body is on hand (no
      *  already-extracted disclosure to reuse). */
-    fun reLabel(messageBody: String, address: String, override: String? = null): String =
-        reLabel(extract(messageBody), messageBody, address, override)
+    fun reLabel(
+        messageBody: String,
+        address: String,
+        override: String? = null,
+        guessingEnabled: Boolean = true
+    ): String =
+        reLabel(extract(messageBody), messageBody, address, override, guessingEnabled)
 
     /** Tier 1: last name(s) found in the disclosure text, e.g. "Smith" or
      *  "Smith/Jones" for two. Null if nothing name-shaped was found. */
@@ -182,13 +215,14 @@ object AttributionExtractor {
 
     /** Tier 3: no disclosure at all (or nothing name/business-shaped in
      *  it) - guess Political vs Commercial from the message's own
-     *  wording. Defaults to Commercial when the guess is a toss-up, since
-     *  compliant political texts almost always carry a disclosure that
-     *  would have already been caught above. */
+     *  wording. Round 8: defaults to Political on a toss-up (flipped from
+     *  Commercial, per Mr. George's 2026-09-21 request) - most of the
+     *  volume he was seeing mislabeled was political spam without a
+     *  recognizable disclosure line, not commercial spam. */
     private fun classifyPoliticalOrCommercial(messageBody: String): String {
         val lower = messageBody.lowercase()
         val politicalScore = POLITICAL_KEYWORDS.count { lower.contains(it) }
         val commercialScore = COMMERCIAL_KEYWORDS.count { lower.contains(it) }
-        return if (politicalScore > commercialScore) "Political" else "Commercial"
+        return if (commercialScore > politicalScore) "Commercial" else "Political"
     }
 }

@@ -27,13 +27,27 @@ package com.georgeapp.bulksmsreply
  *   rescale. The v0.11-v0.16 numbers below are the SAME rounds, renamed -
  *   nothing about what those rounds did has changed, only the number.
  */
-const val APP_VERSION = "v0.17"
+const val APP_VERSION = "v0.18"
 
 /** One entry in the app's version history, newest first in
  *  [APP_VERSION_HISTORY]. */
 data class VersionHistoryEntry(val version: String, val notes: String)
 
 val APP_VERSION_HISTORY: List<VersionHistoryEntry> = listOf(
+    VersionHistoryEntry(
+        "v0.18",
+        "Political/Commercial guess now defaults to Political on a toss-up (was " +
+            "Commercial), and the shared \"reply stop\"/\"text stop\" opt-out phrases no " +
+            "longer count as Commercial evidence - both were quietly mislabeling " +
+            "political spam. Added \"Personal\" and \"Other\" as label choices, with a " +
+            "confirmation warning before a bulk reply/block/report action is applied to " +
+            "any conversation labeled Personal (it stays fully selectable - this only " +
+            "asks you to confirm). Added a Settings toggle to turn automatic Political/" +
+            "Commercial guessing off entirely (fully reversible; manual labels and " +
+            "name/business detection from a disclosure line are unaffected). Added bulk " +
+            "relabeling on the Messages tab - set one label on every selected " +
+            "conversation at once instead of one at a time."
+    ),
     VersionHistoryEntry(
         "v0.17",
         "The label tag icon now appears on EVERY tab that shows a sender label - " +

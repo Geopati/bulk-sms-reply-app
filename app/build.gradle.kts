@@ -16,8 +16,8 @@ android {
         // so the app reads as pre-1.0/still-in-development - see the note
         // atop AppInfo.kt. versionCode is unaffected by this and simply
         // keeps incrementing by 1 each round, same as always.
-        versionCode = 4
-        versionName = "0.17.0"
+        versionCode = 5
+        versionName = "0.18.0"
     }
 
     signingConfigs {

@@ -16,20 +16,29 @@ data class MessageLogEntry(
      *  Messages app does not see it (see MessageLogDatabase.markThreadRead
      *  for why). */
     val readLocally: Boolean = false,
-    /** Mr. George's manual Political/Commercial/No-label choice for this
-     *  sender's number, if he's set one (Round 6) - one of
+    /** Mr. George's manual label choice for this sender's number, if he's
+     *  set one (Round 6; Personal/Other added Round 8) - one of
      *  AttributionExtractor.OVERRIDE_POLITICAL/OVERRIDE_COMMERCIAL/
-     *  OVERRIDE_NONE, or null for "automatic." Looked up by normalized
-     *  address when this entry is loaded from the database. */
-    val labelOverride: String? = null
+     *  OVERRIDE_PERSONAL/OVERRIDE_OTHER/OVERRIDE_NONE, or null for
+     *  "automatic." Looked up by normalized address when this entry is
+     *  loaded from the database. */
+    val labelOverride: String? = null,
+    /** Mr. George's app-wide automatic-guessing toggle (Round 8), as of
+     *  when this entry was loaded - see AppSettings.automaticGuessingEnabled
+     *  and AttributionExtractor.reLabel's guessingEnabled parameter. Baked
+     *  in at query time (like labelOverride above) so this entry's
+     *  senderLabel/senderGroupKey stay consistent with each other without
+     *  every caller having to pass the setting in separately. */
+    val guessingEnabled: Boolean = true
 ) {
     /** What to show as "who this was from": the "RE: ..." label (Round 5) -
      *  a last name or business name found in the message's own disclosure,
-     *  a Political/Commercial guess when it doesn't say, or Mr. George's
-     *  own manual override (Round 6) when he's set one. See
-     *  AttributionExtractor.reLabel for the priority order. */
+     *  a Political/Commercial guess when it doesn't say (unless Round 8's
+     *  guessing toggle is off), or Mr. George's own manual override (Round
+     *  6/8) when he's set one. See AttributionExtractor.reLabel for the
+     *  priority order. */
     val senderLabel: String
-        get() = AttributionExtractor.reLabel(attribution, body, address, labelOverride)
+        get() = AttributionExtractor.reLabel(attribution, body, address, labelOverride, guessingEnabled)
 
     /** The key used to group this entry with others from the same
      *  real-world sender for the reports screen. Grouping by the RE: label

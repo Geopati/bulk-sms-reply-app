@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var blocklistStore: BlocklistStore
     private lateinit var messageLogDatabase: MessageLogDatabase
+    private lateinit var appSettings: AppSettings
 
     private val requiredPermissions = arrayOf(
         Manifest.permission.READ_SMS,
@@ -48,12 +49,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         blocklistStore = BlocklistStore(this)
         messageLogDatabase = MessageLogDatabase(this)
+        appSettings = AppSettings(this)
 
         setContent {
             BulkTextReplyTheme {
                 AppRoot(
                     blocklistStore = blocklistStore,
                     messageLogDatabase = messageLogDatabase,
+                    appSettings = appSettings,
                     requiredPermissions = requiredPermissions
                 )
             }
@@ -65,6 +68,7 @@ class MainActivity : ComponentActivity() {
 private fun AppRoot(
     blocklistStore: BlocklistStore,
     messageLogDatabase: MessageLogDatabase,
+    appSettings: AppSettings,
     requiredPermissions: Array<String>
 ) {
     val context = LocalContext.current
@@ -92,10 +96,15 @@ private fun AppRoot(
     var processedConversations by remember {
         mutableStateOf<List<MessageLogDatabase.ProcessedConversation>>(emptyList())
     }
-    // Round 6: Mr. George's manual Political/Commercial/No-label choices,
-    // normalized address -> override value. Loaded alongside everything
-    // else below and re-loaded on every refreshTrigger bump.
+    // Round 6: Mr. George's manual label choices (Personal/Other added
+    // Round 8), normalized address -> override value. Loaded alongside
+    // everything else below and re-loaded on every refreshTrigger bump.
     var labelOverrides by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // Round 8: Mr. George's app-wide opt-out toggle for the automatic
+    // Political/Commercial guess only - see AppSettings and
+    // AttributionExtractor.reLabel's guessingEnabled parameter. Read once
+    // at startup from persisted storage; kept in sync with it below.
+    var guessingEnabled by remember { mutableStateOf(appSettings.automaticGuessingEnabled) }
 
     var logSearchText by remember { mutableStateOf("") }
     var logRangeDays by remember { mutableStateOf<Int?>(30) }
@@ -113,7 +122,7 @@ private fun AppRoot(
     // Reload the conversation list AND add any newly-seen messages to the
     // running log whenever permission is granted or a bulk action changes
     // things (refreshTrigger).
-    LaunchedEffect(permissionsGranted, refreshTrigger) {
+    LaunchedEffect(permissionsGranted, refreshTrigger, guessingEnabled) {
         if (permissionsGranted) {
             val rawMessages = SmsRepository.loadAllRawMessages(context)
             messageLogDatabase.recordIncoming(rawMessages)
@@ -121,7 +130,7 @@ private fun AppRoot(
             // Round 5: figure out which conversations are already
             // processed (S.R.B. tab) BEFORE building the Messages list,
             // so processed ones can be filtered out of Messages entirely.
-            val processed = messageLogDatabase.processedConversations()
+            val processed = messageLogDatabase.processedConversations(guessingEnabled)
             processedConversations = processed
             val processedAddresses = processed.map { it.normalizedAddress }.toSet()
 
@@ -139,20 +148,21 @@ private fun AppRoot(
 
     // Re-query the log whenever its own search/range filters change, a
     // bulk action just happened, or the user switches to that tab.
-    LaunchedEffect(logSearchText, logRangeDays, refreshTrigger, selectedTab, permissionsGranted) {
+    LaunchedEffect(logSearchText, logRangeDays, refreshTrigger, selectedTab, permissionsGranted, guessingEnabled) {
         if (permissionsGranted && selectedTab == AppTab.LOG) {
             logEntries = messageLogDatabase.queryLog(
                 searchText = logSearchText,
-                sinceMillis = rangeDaysToSinceMillis(logRangeDays)
+                sinceMillis = rangeDaysToSinceMillis(logRangeDays),
+                guessingEnabled = guessingEnabled
             )
         }
     }
 
     // Rebuild the day/week/month/etc. report whenever the chosen period,
     // the underlying data, or the active tab changes.
-    LaunchedEffect(reportPeriod, refreshTrigger, selectedTab, permissionsGranted) {
+    LaunchedEffect(reportPeriod, refreshTrigger, selectedTab, permissionsGranted, guessingEnabled) {
         if (permissionsGranted && selectedTab == AppTab.REPORTS) {
-            val allEntries = messageLogDatabase.allForReports(sinceMillis = null)
+            val allEntries = messageLogDatabase.allForReports(sinceMillis = null, guessingEnabled = guessingEnabled)
             reportBuckets = ReportGenerator.build(allEntries, reportPeriod)
         }
     }
@@ -172,6 +182,32 @@ private fun AppRoot(
     // logic and can't drift apart from each other.
     val setLabelOverride: (String, String?) -> Unit = { address, override ->
         messageLogDatabase.setLabelOverride(address, override)
+        refreshTrigger += 1
+    }
+
+    // Round 8: flips the persisted automatic-guessing setting and updates
+    // the in-memory copy together, so every screen re-reads it on the same
+    // refresh (see the LaunchedEffect blocks above, all keyed on
+    // guessingEnabled).
+    val setGuessingEnabled: (Boolean) -> Unit = { enabled ->
+        appSettings.automaticGuessingEnabled = enabled
+        guessingEnabled = enabled
+        refreshTrigger += 1
+    }
+
+    // Round 8: bulk relabel for the Messages tab - applies one override to
+    // every currently-selected conversation in one pass, reusing the same
+    // per-number setLabelOverride under the hood so it stays retroactive
+    // and consistent with the single-row tag icon everywhere else.
+    val applyBulkLabelOverride: (String?) -> Unit = { override ->
+        val targetedAddresses = allConversations
+            .filter { selectedAddresses.contains(it.address) }
+            .map { it.address }
+        targetedAddresses.forEach { address -> messageLogDatabase.setLabelOverride(address, override) }
+        val optionLabel = AttributionExtractor.OVERRIDE_OPTIONS
+            .firstOrNull { it.second == override }?.first ?: "Automatic"
+        snackbarMessage = "Set \"$optionLabel\" on ${targetedAddresses.size} conversation" +
+            "${if (targetedAddresses.size == 1) "" else "s"}."
         refreshTrigger += 1
     }
 
@@ -274,7 +310,10 @@ private fun AppRoot(
                             messageLogDatabase.markAllRead(addresses, System.currentTimeMillis())
                             snackbarMessage = "Marked ${addresses.size} conversation${if (addresses.size == 1) "" else "s"} as read."
                             refreshTrigger += 1
-                        }
+                        },
+                        onApplyBulkLabelOverride = applyBulkLabelOverride,
+                        guessingEnabled = guessingEnabled,
+                        onSetGuessingEnabled = setGuessingEnabled
                     )
 
                     AppTab.SRB -> SrbScreen(

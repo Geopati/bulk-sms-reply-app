@@ -58,15 +58,34 @@ bigger goal of a publishable app.
     moves to S.R.B.; it's a pure decluttering shortcut.
   - Each row also has a small tag icon (Round 6) next to its `RE:` label -
     tap it to manually set that number's label to Political, Commercial,
-    or No label (just shows the phone number), or back to Automatic. Your
-    choice is remembered and applies everywhere that number shows up
-    (Messages, Log, Reports, S.R.B.) until you change it again. The icon
-    fills in with color when a manual choice is active, so you can tell
-    at a glance which numbers you've corrected. **As of Round 7, this same
-    tag icon is on every tab that shows a label** (S.R.B., Log, and
-    Reports too) - not just Messages, so you can fix a wrong guess
-    wherever you actually notice it, including after a conversation has
-    already been processed and moved to S.R.B.
+    Personal, Other (both new in Round 8), or No label (just shows the
+    phone number), or back to Automatic. Your choice is remembered and
+    applies everywhere that number shows up (Messages, Log, Reports,
+    S.R.B.) until you change it again. The icon fills in with color when a
+    manual choice is active, so you can tell at a glance which numbers
+    you've corrected. **As of Round 7, this same tag icon is on every tab
+    that shows a label** (S.R.B., Log, and Reports too) - not just
+    Messages, so you can fix a wrong guess wherever you actually notice
+    it, including after a conversation has already been processed and
+    moved to S.R.B.
+  - **New in Round 8: a "Label" button** appears next to "Bulk action"
+    whenever you have conversations selected, letting you set one label
+    on all of them at once instead of tapping each row's tag icon in
+    turn. This bulk-relabel button is deliberately only on this tab -
+    Log/Reports/S.R.B. still use the per-row tag icon only.
+  - **New in Round 8: a gear (Settings) icon** next to the (i) info icon
+    opens a small dialog with one toggle: "Guess Political/Commercial
+    automatically." Turning it off does not remove or hide any label a
+    number already has - it only stops brand-new, unlabeled numbers from
+    getting a guessed Political/Commercial tag; they show the phone
+    number instead until a real disclosure name turns up or you set a
+    manual label. Fully reversible any time.
+  - **New in Round 8: a "Personal" label warning.** If you apply a bulk
+    reply/block/report action to a selection that includes any
+    conversation you've labeled Personal, a warning dialog asks you to
+    confirm first, naming how many are affected. Personal stays fully
+    selectable and actionable either way - this only exists to catch an
+    accidental "that's not spam" mistake before it's sent.
 - **S.R.B.** (Stop / Report / Block) - new in Round 5. Every conversation
   you've already applied a bulk action to lives here instead of in
   Messages, each showing which action(s) were taken (Replied / Reported /
@@ -113,20 +132,43 @@ worked out in this order from the message text:
 3. **A best guess of "Political" or "Commercial"**, if neither a name nor
    a business turned up, based on which of those two categories the
    message's own wording leans toward (the keyword list behind this guess
-   was widened in Round 6 for better accuracy, but it's still a guess).
+   was widened in Round 6 for better accuracy, and refined again in Round
+   8 - see "Round 8 label improvements" below). Skipped entirely if you've
+   turned off automatic guessing in Settings (Round 8) - see the Messages
+   tab section above.
 
 This is a plain keyword/pattern heuristic, not machine learning, so it
 will sometimes mislabel or miss - it's meant as a quick at-a-glance sort,
 not a certified attribution. **If it gets one wrong:** tap the small tag
 icon next to that conversation's label - **as of Round 7, this works on
 every tab** (Messages, S.R.B., Log, and Reports), not only Messages - and
-pick Political, Commercial, or No label yourself. That choice is saved
-and always wins over the automatic guess for that number from then on,
-everywhere it appears in the app - pick "Automatic" from the same menu
-to go back to letting the app guess again. (Round 6 introduced this
-override but only wired it up on the Messages tab, which meant a
-conversation lost that option the moment a bulk action moved it to
-S.R.B. - Round 7 fixes that gap.)
+pick Political, Commercial, Personal, Other, or No label yourself (the
+last two added Round 8). That choice is saved and always wins over the
+automatic guess for that number from then on, everywhere it appears in
+the app - pick "Automatic" from the same menu to go back to letting the
+app guess again. (Round 6 introduced this override but only wired it up
+on the Messages tab, which meant a conversation lost that option the
+moment a bulk action moved it to S.R.B. - Round 7 fixes that gap.) As of
+Round 8, you can also set one label on every currently-selected
+conversation at once from the Messages tab's "Label" button, instead of
+one at a time.
+
+### Round 8 label improvements (2026-09-21)
+
+Mr. George noticed that unlabeled numbers were defaulting to "Commercial"
+even though most of his unwanted texts are political. Two fixes:
+
+- **The toss-up default flipped from Commercial to Political.** When the
+  keyword count comes out tied, the guess is now Political.
+- **The shared opt-out phrases "reply stop" and "text stop" no longer
+  count as Commercial evidence.** Those phrases are boilerplate required
+  on nearly any bulk text, political ones included, so counting them
+  toward "Commercial" was quietly dragging political spam the wrong way
+  whenever its disclosure line wasn't recognized.
+
+Neither change touches a number that already has a manual label, or a
+message where a real name/business was found in its own disclosure line -
+only the content-based guess used as a last resort.
 
 ## Versioning
 
@@ -247,6 +289,8 @@ project than this MVP, tracked separately in the project notes.
   - `SmsRepository.kt` - reads the SMS inbox into conversations
   - `SendHelper.kt` - sends the bulk reply / spam-report messages
   - `BlocklistStore.kt` - app-local "hide this number" list
+  - `AppSettings.kt` (Round 8) - small app-wide toggles, starting with the
+    automatic-guessing on/off switch
   - `PhoneNumbers.kt` - loose phone-number matching helper
   - `MessageLogDatabase.kt` - the running SQLite log, including which
     conversations count as "processed" (S.R.B.)

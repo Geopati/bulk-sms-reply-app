@@ -49,7 +49,7 @@ fun LabelTagButton(
         ) {
             Icon(
                 Icons.Filled.Sell,
-                contentDescription = "Set Political/Commercial/No label",
+                contentDescription = "Set Political/Commercial/Personal/Other/No label",
                 modifier = Modifier.size(16.dp),
                 // A filled-in color hints at a glance that this number has
                 // a manual override set, rather than the automatic guess.

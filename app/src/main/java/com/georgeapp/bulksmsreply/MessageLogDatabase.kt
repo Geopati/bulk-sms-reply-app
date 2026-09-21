@@ -254,8 +254,11 @@ class MessageLogDatabase(context: Context) :
         val action: String,
         val actionAtMillis: Long,
         /** Mr. George's manual label override for this number, if any
-         *  (Round 6) - see MessageLogEntry.labelOverride. */
-        val labelOverride: String? = null
+         *  (Round 6/8) - see MessageLogEntry.labelOverride. */
+        val labelOverride: String? = null,
+        /** See MessageLogEntry.guessingEnabled (Round 8) - baked in at
+         *  query time the same way. */
+        val guessingEnabled: Boolean = true
     )
 
     /**
@@ -264,7 +267,7 @@ class MessageLogDatabase(context: Context) :
      * filter that hides them there (see MainActivity). Uses only the
      * existing action/action_at columns - no schema change needed.
      */
-    fun processedConversations(): List<ProcessedConversation> {
+    fun processedConversations(guessingEnabled: Boolean = true): List<ProcessedConversation> {
         val overrides = labelOverrides()
         val sql = """
             SELECT $COL_NORMALIZED_ADDRESS, $COL_ADDRESS, $COL_ATTRIBUTION, $COL_BODY, $COL_ACTION, $COL_ACTION_AT
@@ -295,7 +298,8 @@ class MessageLogDatabase(context: Context) :
                         body = cursor.getString(bodyIdx),
                         action = cursor.getString(actionIdx),
                         actionAtMillis = cursor.getLong(actionAtIdx),
-                        labelOverride = overrides[normalizedAddress]
+                        labelOverride = overrides[normalizedAddress],
+                        guessingEnabled = guessingEnabled
                     )
                 )
             }
@@ -307,9 +311,16 @@ class MessageLogDatabase(context: Context) :
      * Searchable view of the log for the Log screen. [searchText] matches
      * against the sender number, the extracted attribution, and the
      * message body (case-insensitive substring). [sinceMillis] limits how
-     * far back to look; pass null for "all time".
+     * far back to look; pass null for "all time". [guessingEnabled] is
+     * Mr. George's app-wide automatic-guessing toggle (Round 8) - see
+     * AppSettings.automaticGuessingEnabled.
      */
-    fun queryLog(searchText: String?, sinceMillis: Long?, limit: Int = 500): List<MessageLogEntry> {
+    fun queryLog(
+        searchText: String?,
+        sinceMillis: Long?,
+        limit: Int = 500,
+        guessingEnabled: Boolean = true
+    ): List<MessageLogEntry> {
         val whereParts = mutableListOf<String>()
         val whereArgs = mutableListOf<String>()
 
@@ -334,21 +345,26 @@ class MessageLogDatabase(context: Context) :
             null, null,
             "$COL_SMS_DATE DESC",
             limit.toString()
-        ).use { cursor -> cursor.toEntries(overrides) }
+        ).use { cursor -> cursor.toEntries(overrides, guessingEnabled) }
     }
 
     /** All logged messages since [sinceMillis] (or all time if null), for
-     *  building the day/week/month/etc. reports. No row-count limit. */
-    fun allForReports(sinceMillis: Long?): List<MessageLogEntry> {
+     *  building the day/week/month/etc. reports. No row-count limit.
+     *  [guessingEnabled] is Mr. George's app-wide automatic-guessing
+     *  toggle (Round 8) - see AppSettings.automaticGuessingEnabled. */
+    fun allForReports(sinceMillis: Long?, guessingEnabled: Boolean = true): List<MessageLogEntry> {
         val where = sinceMillis?.let { "$COL_SMS_DATE >= ?" }
         val args = sinceMillis?.let { arrayOf(it.toString()) }
         val overrides = labelOverrides()
         return readableDatabase.query(
             TABLE, null, where, args, null, null, "$COL_SMS_DATE DESC"
-        ).use { cursor -> cursor.toEntries(overrides) }
+        ).use { cursor -> cursor.toEntries(overrides, guessingEnabled) }
     }
 
-    private fun android.database.Cursor.toEntries(overrides: Map<String, String> = emptyMap()): List<MessageLogEntry> {
+    private fun android.database.Cursor.toEntries(
+        overrides: Map<String, String> = emptyMap(),
+        guessingEnabled: Boolean = true
+    ): List<MessageLogEntry> {
         val entries = mutableListOf<MessageLogEntry>()
         val idIdx = getColumnIndexOrThrow(COL_ID)
         val dateIdx = getColumnIndexOrThrow(COL_SMS_DATE)
@@ -373,7 +389,8 @@ class MessageLogDatabase(context: Context) :
                     action = if (isNull(actionIdx)) null else getString(actionIdx),
                     actionAtMillis = if (isNull(actionAtIdx)) null else getLong(actionAtIdx),
                     readLocally = getInt(readLocallyIdx) != 0,
-                    labelOverride = overrides[normalizedAddress]
+                    labelOverride = overrides[normalizedAddress],
+                    guessingEnabled = guessingEnabled
                 )
             )
         }

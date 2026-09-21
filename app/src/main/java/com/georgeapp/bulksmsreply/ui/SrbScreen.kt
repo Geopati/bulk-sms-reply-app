@@ -89,7 +89,8 @@ private fun SrbRow(
                         conversation.attribution,
                         conversation.body,
                         conversation.address,
-                        conversation.labelOverride
+                        conversation.labelOverride,
+                        conversation.guessingEnabled
                     ),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f, fill = false)
